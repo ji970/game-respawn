@@ -2,7 +2,7 @@
   "name": "物资刷新提醒",
   "short_name": "刷新提醒",
   "description": "游戏物资刷新倒计时通知工具",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f0f1a",
