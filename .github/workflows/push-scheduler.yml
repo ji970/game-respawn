@@ -2,7 +2,7 @@ name: Push Notification Scheduler
 
 on:
   schedule:
-    - cron: '*/1 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -24,13 +24,14 @@ jobs:
           const webpush = require('web-push');
           webpush.setVapidDetails('https://ji970.github.io/game-respawn/', process.env.VAPID_PUBLIC, process.env.VAPID_PRIVATE);
           async function main() {
-            const now = new Date().toISOString();
-            const res = await fetch(process.env.SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&notify_at=lte.' + now + '&limit=50', {
+            const res = await fetch(process.env.SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&limit=50', {
               headers: { apikey: process.env.SUPABASE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_KEY }
             });
-            const pushes = await res.json();
-            if (!Array.isArray(pushes) || pushes.length === 0) { console.log('No pending'); return; }
-            console.log('Found ' + pushes.length + ' pushes');
+            let pushes = await res.json();
+            if (!Array.isArray(pushes)) { console.log('No pending'); return; }
+            const now = Date.now();
+            pushes = pushes.filter(p => new Date(p.notify_at).getTime() <= now);
+            console.log('Due: ' + pushes.length + ' / ' + pushes.length);
             for (const p of pushes) {
               try {
                 await webpush.sendNotification({ endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } }, JSON.stringify({ title: p.title, body: p.body }));
