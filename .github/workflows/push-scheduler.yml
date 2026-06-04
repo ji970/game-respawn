@@ -2,8 +2,6 @@ name: Push Notification Scheduler
 
 on:
   push:
-    paths:
-      - '.github/workflows/push-scheduler.yml'
   schedule:
     - cron: '* * * * *'  # every minute
   workflow_dispatch:
