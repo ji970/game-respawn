@@ -821,29 +821,7 @@ function renderCards() {
 
     let countdownHtml = '';
     let countdownCls = '';
-    if (!mainRunning && hasActiveClone) {
-      // Only clones running — show nearest clone countdown
-      const mult = testMode ? 60 : 1;
-      let nearest = Infinity;
-      [1,2,3].forEach(s => {
-        const c = state.clones && state.clones[s];
-        if (c && (c.minNotified === false || c.maxNotified === false)) {
-          const el = (Date.now() - c.startTime) / 1000 * mult;
-          const adv = 2;
-          let sec = c.max * 60 - adv * 60 - el;
-          if (c.variable && c.minNotified === false) {
-            sec = Math.min(sec, c.min * 60 - adv * 60 - el);
-          }
-          if (sec < nearest) nearest = sec;
-        }
-      });
-      if (nearest <= 0) {
-        countdownHtml = '分身已刷新';
-        countdownCls = 'expired-text';
-      } else {
-        countdownHtml = '⏳ 分身 ' + formatCountdown(Math.ceil(nearest));
-      }
-    } else if (isRunning && state.startTime) {
+    if (isRunning && state.startTime) {
       const now = Date.now();
       const mult = testMode ? 60 : 1;
       const elapsed = (now - state.startTime) / 1000 * mult;
@@ -1010,8 +988,9 @@ function startTimer(r) {
   const now = Date.now();
   const island = islandSelections[r.id] || 1;
 
+  const existingClones = (timers[r.id] && timers[r.id].clones) || {};
+
   if (r.daily) {
-    // Daily reminder mode: next 0:00 or 12:00
     timers[r.id] = {
       startTime: now,
       min: 0, max: 0,
@@ -1019,6 +998,7 @@ function startTimer(r) {
       variable: false, daily: true,
       island: island,
       dailyNotified: {},
+      clones: existingClones,
     };
     saveTimers(timers);
     checkDailyTimers(r.id, timers[r.id]);
@@ -1033,6 +1013,7 @@ function startTimer(r) {
       maxNotified: false,
       variable: r.v || false,
       island: island,
+      clones: existingClones,
     };
     saveTimers(timers);
     renderCards();
@@ -1056,12 +1037,9 @@ function startClone(rid, slot) {
   const isRunning = existing && (existing.minNotified === false || existing.maxNotified === false);
 
   if (isRunning) {
-    const elapsed = Math.floor((Date.now() - existing.startTime) / 1000 / 60);
-    if (confirm(r.name + ' 分身' + slot + '\n已计时' + formatTime(elapsed) + '\n\n重新开始？')) {
-      timers[rid].clones[slot] = null;
-    } else {
-      return;
-    }
+    cancelTimer(rid, slot);
+    toast(r.name + ' 分身' + slot + ' 已停止');
+    return;
   }
 
   const island = islandSelections[rid] || 1;
