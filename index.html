@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<title>物资刷新提醒</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #222240;
+  --text: #e0e0e0;
+  --text2: #a0a0b8;
+  --accent: #4fc3f7;
+  --accent2: #ffb74d;
+  --danger: #ef5350;
+  --success: #66bb6a;
+  --border: #2a2a45;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Header */
+header {
+  background: var(--surface);
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
+header .sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+/* Category tabs */
+nav {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 60px;
+  z-index: 9;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+nav::-webkit-scrollbar { display: none; }
+nav button {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+nav button.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Resource grid */
+main { padding: 12px; max-width: 600px; margin: 0 auto; }
+.category-title { font-size: 14px; color: var(--text2); padding: 8px 4px; display: none; }
+.category-title.visible { display: block; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+/* Resource card */
+.card {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.card:active { transform: scale(0.95); }
+.card.idle { border-color: transparent; }
+.card.running { border-color: var(--accent); animation: pulse 2s infinite; }
+.card.expired { border-color: var(--success); }
+
+@keyframes pulse {
+  0%, 100% { border-color: var(--accent); }
+  50% { border-color: rgba(79,195,247,0.3); }
+}
+
+.card .icon-wrap {
+  width: 48px; height: 48px;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.card .icon-wrap img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.card .icon-wrap .placeholder {
+  font-size: 22px;
+  color: var(--text2);
+}
+.card .name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card .time-label {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.card .countdown {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent2);
+  margin-top: 4px;
+  min-height: 16px;
+}
+.card .countdown.expired-text { color: var(--success); }
+.card .cancel-btn {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  line-height: 22px;
+  cursor: pointer;
+  display: none;
+  padding: 0;
+}
+.card.running .cancel-btn { display: block; }
+.card.running .cancel-btn:active { background: #c62828; }
+
+/* Notify permission banner */
+.permission-banner {
+  background: var(--surface2);
+  text-align: center;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--accent2);
+  cursor: pointer;
+  display: none;
+}
+.permission-banner.show { display: block; }
+
+/* Reset all button */
+.toolbar {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  gap: 10px;
+}
+.toolbar button {
+  padding: 6px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+
+/* Island selector */
+.island-wrap {
+  position: relative;
+  margin-top: 5px;
+}
+.island-btn {
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--accent2);
+  font-size: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.island-btn:active { background: var(--accent2); color: #000; }
+.island-popup {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 6px;
+  z-index: 20;
+  grid-template-columns: repeat(5, 26px);
+  gap: 3px;
+  margin-bottom: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.island-popup.open { display: grid; }
+.island-popup button {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 26px;
+}
+.island-popup button:active { background: var(--accent); color: #000; }
+.island-popup button.sel {
+  background: var(--accent2);
+  color: #000;
+  border-color: var(--accent2);
+  font-weight: 700;
+}
+.daily-badge {
+  display: inline-block;
+  background: #7c4dff;
+  color: #fff;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-top: 3px;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  color: var(--text);
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  border: 1px solid var(--border);
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>物资刷新提醒</h1>
+  <div class="sub">点击物资图标开始倒计时</div>
+</header>
+
+<div class="permission-banner" id="permBanner" onclick="requestNotificationPermission()">
+  📢 点击此处开启通知权限，刷新时提醒你
+</div>
+
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<div class="toolbar">
+  <button onclick="resetAll()">重置全部计时</button>
+  <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== 物资数据 ======
+const resources = [
+  // 农作物
+  { id:1,  name:'辣椒', cat:'crop', min:30, max:30, icon:'' },
+  { id:2,  name:'草莓', cat:'crop', min:30, max:30, icon:'' },
+  { id:3,  name:'蓝莓', cat:'crop', min:30, max:30, icon:'' },
+  { id:4,  name:'小麦', cat:'crop', min:30, max:30, icon:'' },
+  // 稀有植物
+  { id:5,  name:'竹笋', cat:'plant', min:120, max:120, icon:'' },
+  { id:6,  name:'毒蘑菇', cat:'plant', min:120, max:120, icon:'' },
+  { id:7,  name:'粉色烈焰', cat:'plant', min:120, max:120, icon:'' },
+  { id:8,  name:'曼陀罗', cat:'plant', min:60, max:60, icon:'' },
+  { id:9,  name:'青魔王花', cat:'plant', min:60, max:60, icon:'' },
+  { id:10, name:'幽灵百合', cat:'plant', min:40, max:40, icon:'' },
+  { id:11, name:'松露', cat:'plant', min:300, max:300, icon:'' },
+  { id:12, name:'红莲', cat:'plant', min:720, max:720, icon:'' },
+  { id:13, name:'蓝莲', cat:'plant', min:720, max:720, icon:'' },
+  { id:14, name:'龙涎草', cat:'plant', min:720, max:720, icon:'' },
+  { id:15, name:'水晶睡莲', cat:'plant', min:720, max:720, icon:'' },
+  { id:16, name:'夕阳花', cat:'plant', min:720, max:960, icon:'', v:true, note:'天空岛，随机点位' },
+  { id:17, name:'霜冻龙涎草', cat:'plant', min:540, max:900, icon:'', v:true, note:'北境' },
+  { id:18, name:'远古花苞', cat:'plant', min:0, max:0, icon:'', daily:true, note:'每日0:00和12:00自动提醒' },
+  // 精英怪物
+  { id:19, name:'剑齿虎王', cat:'elite', min:25, max:25, icon:'' },
+  { id:20, name:'岩火虎王', cat:'elite', min:25, max:25, icon:'' },
+  { id:21, name:'毒液龙王', cat:'elite', min:80, max:80, icon:'' },
+  { id:22, name:'暴力兔王', cat:'elite', min:80, max:80, icon:'' },
+  { id:23, name:'水池龟', cat:'elite', min:120, max:120, icon:'' },
+  { id:24, name:'岩浆龟', cat:'elite', min:120, max:120, icon:'' },
+  // BOSS坐骑
+  { id:25, name:'巨猿', cat:'boss', min:540, max:540, icon:'' },
+  { id:26, name:'猛犸', cat:'boss', min:540, max:540, icon:'' },
+  { id:27, name:'雪猛犸', cat:'boss', min:900, max:900, icon:'' },
+  { id:28, name:'霸王龙', cat:'boss', min:720, max:720, icon:'' },
+  { id:29, name:'暗黑霸王龙', cat:'boss', min:1440, max:1440, icon:'' },
+  { id:30, name:'上古鳄龙', cat:'boss', min:1440, max:1440, icon:'' },
+  // 稀有世界BOSS
+  { id:31, name:'卡皮巴拉', cat:'rare', min:2880, max:4320, icon:'', v:true, note:'2~3天' },
+  { id:32, name:'沼泽领主', cat:'rare', min:2880, max:4320, icon:'', v:true, note:'2~3天' },
+  { id:33, name:'巨兽龙', cat:'rare', min:2880, max:10080, icon:'', v:true, note:'2~7天' },
+  // 新图渊海
+  { id:34, name:'普通小怪', cat:'ocean', min:1, max:1, icon:'' },
+  { id:35, name:'精英材料怪', cat:'ocean', min:720, max:720, icon:'' },
+  { id:36, name:'可捕捉精英', cat:'ocean', min:30, max:30, icon:'' },
+  { id:37, name:'渊海珍贝', cat:'ocean', min:180, max:180, icon:'' },
+  // 特殊稀有
+  { id:38, name:'美人鱼', cat:'special', min:720, max:720, icon:'' },
+  { id:39, name:'氤氲之气', cat:'special', min:5, max:5, icon:'', note:'火山' },
+  { id:40, name:'深海珊瑚', cat:'special', min:540, max:900, icon:'', v:true, note:'9~15h' },
+  // 宝箱
+  { id:41, name:'金宝箱', cat:'chest', min:30, max:60, icon:'', v:true },
+  { id:42, name:'银宝箱', cat:'chest', min:30, max:60, icon:'', v:true },
+  { id:43, name:'附魔石宝箱', cat:'chest', min:60, max:60, icon:'' },
+  { id:44, name:'水晶宝箱', cat:'chest', min:60, max:60, icon:'' },
+  { id:45, name:'黑曜石宝箱', cat:'chest', min:180, max:180, icon:'' },
+  { id:46, name:'纳坦岛宝箱', cat:'chest', min:180, max:180, icon:'' },
+  { id:47, name:'天空专家宝箱', cat:'chest', min:180, max:180, icon:'' },
+  { id:48, name:'天空大师宝箱', cat:'chest', min:180, max:180, icon:'' },
+  // 远古飞龙
+  { id:49, name:'熔火龙', cat:'dragon', min:4320, max:5760, icon:'', v:true, note:'3~4天' },
+  { id:50, name:'北境骨龙', cat:'dragon', min:4320, max:5760, icon:'', v:true, note:'3~4天' },
+  { id:51, name:'苍穹幻龙', cat:'dragon', min:4320, max:5760, icon:'', v:true, note:'3~4天' },
+  // 新增物资
+  { id:52, name:'海底大触手精英怪', cat:'elite', min:180, max:360, icon:'', v:true, note:'海底，3~6h' },
+  { id:53, name:'海底精英怪', cat:'elite', min:180, max:180, icon:'', note:'海底' },
+  { id:54, name:'天空岛精英怪', cat:'elite', min:180, max:180, icon:'', note:'天空岛' },
+  { id:55, name:'淘气仙灵', cat:'special', min:360, max:480, icon:'', v:true, note:'6~8h' },
+  { id:56, name:'瓦雷亚宝箱', cat:'chest', min:180, max:180, icon:'', note:'瓦雷亚' },
+  { id:57, name:'从容花苞', cat:'plant', min:120, max:240, icon:'', v:true, note:'2~4h' },
+  { id:58, name:'普通花苞', cat:'plant', min:1440, max:2880, icon:'', v:true, note:'1~2天' },
+];
+
+const categories = [
+  { key:'active', label:'⏱ 活跃计时' },
+  { key:'crop',    label:'🌾 农作物' },
+  { key:'plant',   label:'🌿 稀有植物' },
+  { key:'elite',   label:'👹 精英怪' },
+  { key:'boss',    label:'🐉 BOSS坐骑' },
+  { key:'rare',    label:'💀 稀有世界BOSS' },
+  { key:'ocean',   label:'🌊 新图渊海' },
+  { key:'special', label:'💎 特殊稀有' },
+  { key:'chest',   label:'📦 宝箱' },
+  { key:'dragon',  label:'🔥 远古飞龙' },
+];
+
+// ====== 状态管理 ======
+const STORAGE_KEY = 'respawn_timers';
+const islandSelections = {}; // per-resource island selection (UI only, defaults to 1)
+const MIN_CHECK_INTERVAL = 2000; // 2秒检查一次
+let testMode = false; // 测试模式：1分钟=1秒
+let currentCat = 'crop';
+
+function loadTimers() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveTimers(t) { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); }
+
+function getTimerState(resId) {
+  const timers = loadTimers();
+  return timers[resId] || null;
+}
+
+// ====== 通知 ======
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    toast('你的浏览器不支持通知功能');
+    return;
+  }
+  Notification.requestPermission().then(p => {
+    if (p === 'granted') {
+      document.getElementById('permBanner').classList.remove('show');
+      toast('通知已开启');
+    } else {
+      toast('通知权限被拒绝，请在浏览器设置中开启');
+    }
+  });
+}
+
+function notify(title, body) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try {
+      const n = new Notification(title, {
+        body: body,
+        icon: 'icons/icon-192.png',
+        badge: 'icons/icon-72.png',
+        vibrate: [200, 100, 200],
+        tag: 'respawn-notify',
+        renotify: true,
+      });
+      setTimeout(() => n.close(), 8000);
+    } catch(e) { /* ignore */ }
+  }
+}
+
+// ====== 渲染 ======
+function formatTime(minutes) {
+  if (minutes < 60) return minutes + '分钟';
+  if (minutes < 1440) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? h + '小时' + m + '分' : h + '小时';
+  }
+  const d = Math.floor(minutes / 1440);
+  const rest = minutes % 1440;
+  const h = Math.floor(rest / 60);
+  if (h > 0) return d + '天' + h + '小时';
+  return d + '天';
+}
+
+function formatCountdown(remainingSeconds) {
+  if (remainingSeconds <= 0) return '已刷新';
+  const s = Math.abs(remainingSeconds);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  let parts = [];
+  if (d > 0) parts.push(d + '天');
+  if (h > 0) parts.push(h + '时');
+  if (m > 0) parts.push(m + '分');
+  if (parts.length === 0 || (parts.length === 1 && d === 0 && h === 0 && m < 5)) {
+    parts.push(sec + '秒');
+  }
+  return parts.join('');
+}
+
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = categories.map(c =>
+    `<button class="${c.key === currentCat ? 'active' : ''}" data-cat="${c.key}">${c.label}</button>`
+  ).join('');
+  nav.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentCat = btn.dataset.cat;
+      renderNav();
+      renderCards();
+    });
+  });
+}
+
+function renderCards() {
+  const main = document.getElementById('main');
+  const timers = loadTimers();
+  let items;
+  if (currentCat === 'active') {
+    // Show resources with active or completed timers
+    items = resources.filter(r => !!timers[r.id]);
+  } else {
+    items = resources.filter(r => r.cat === currentCat);
+  }
+
+  if (items.length === 0) {
+    main.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
+      <div style="font-size:48px;margin-bottom:12px">⏱️</div>
+      <div>${currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资'}</div>
+    </div>`;
+    return;
+  }
+
+  main.innerHTML = `<div class="grid">${items.map(r => {
+    const state = timers[r.id];
+    const isRunning = state && (state.minNotified === false || state.maxNotified === false);
+    const isExpired = state && state.minNotified === true && state.maxNotified === true;
+    const cls = isExpired ? 'expired' : (isRunning ? 'running' : 'idle');
+
+    let countdownHtml = '';
+    let countdownCls = '';
+    if (isRunning && state.startTime) {
+      const now = Date.now();
+      const mult = testMode ? 60 : 1;
+      const elapsed = (now - state.startTime) / 1000 * mult;
+      // Find the next notification time
+      let nextCheckSec = Infinity;
+      if (state.daily) {
+        countdownHtml = '每日定时中';
+      } else {
+      const ADV = 5;
+      if (state.minNotified === false && r.min !== r.max) {
+        nextCheckSec = Math.max(0, r.min * 60 - ADV * 60) - elapsed;
+        if (nextCheckSec <= 0) nextCheckSec = 0;
+      }
+      if (state.maxNotified === false) {
+        const maxSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+        if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
+        if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
+      }
+      if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+      if (nextCheckSec <= 0) {
+        countdownHtml = '已刷新';
+        countdownCls = 'expired-text';
+      } else {
+        countdownHtml = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+      }
+      }
+    } else if (isExpired) {
+      countdownHtml = '✅ 已刷新';
+      countdownCls = 'expired-text';
+    }
+
+    const timeLabel = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min);
+    const noteAttr = r.note ? ` title="${r.note}"` : '';
+
+    const island = (state && state.island) || (islandSelections[r.id]) || 1;
+    const islandHtml = '<div class="island-wrap">' +
+      '<div class="island-popup">' + Array.from({length:10}, (_,i) =>
+        '<button data-idx="'+(i+1)+'" data-rid="'+r.id+'"' + ((i+1)===island ? ' class="sel"' : '') + '>'+(i+1)+'</button>'
+      ).join('') + '</div>' +
+      '<button class="island-btn" data-rid="'+r.id+'">岛屿 ' + island + '</button>' +
+      '</div>';
+    const dailyBadge = r.daily ? '<div class="daily-badge">每日定时</div>' : '';
+
+    return `
+      <div class="card ${cls}" data-id="${r.id}"${noteAttr}>
+        <button class="cancel-btn" data-id="${r.id}">&times;</button>
+        <div class="icon-wrap">
+          <img src="icons/${r.name}.png" alt="" loading="lazy"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+          <span class="placeholder" style="display:none">${r.name[0]}</span>
+        </div>
+        <div class="name">${r.name}</div>
+        <div class="time-label">${timeLabel}</div>
+        ${dailyBadge}
+        <div class="countdown ${countdownCls}">${countdownHtml}</div>
+        ${islandHtml}
+      </div>`;
+  }).join('')}</div>`;
+
+  // Bind events
+  main.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('cancel-btn')) return;
+      if (e.target.closest('.island-wrap')) return;
+      onCardClick(parseInt(card.dataset.id));
+    });
+  });
+  main.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cancelTimer(parseInt(btn.dataset.id));
+    });
+  });
+  main.querySelectorAll('.island-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popup = btn.parentElement.querySelector('.island-popup');
+      const wasOpen = popup.classList.contains('open');
+      closeAllPopups();
+      if (!wasOpen) popup.classList.add('open');
+    });
+  });
+  main.querySelectorAll('.island-popup button').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(b.dataset.rid);
+      const idx = parseInt(b.dataset.idx);
+      selectIsland(rid, idx);
+      closeAllPopups();
+    });
+  });
+  // Close popups when tapping outside
+  if (!document._popupListener) {
+    document._popupListener = true;
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.island-wrap')) closeAllPopups();
+    });
+  }
+}
+
+function onCardClick(resId) {
+  const r = resources.find(x => x.id === resId);
+  if (!r) return;
+  const state = getTimerState(resId);
+
+  if (state && state.daily) {
+    if (confirm(r.name + '（岛屿' + (state.island || 1) + '）\n每日0:00和12:00自动提醒中\n\n要取消每日提醒吗？')) {
+      cancelTimer(resId);
+    }
+    return;
+  }
+  if (state && state.minNotified === true && state.maxNotified === true) {
+    cancelTimer(resId);
+    toast(r.name + ' 计时已重置，再次点击开始');
+    return;
+  }
+  if (state && (state.minNotified === false || state.maxNotified === false)) {
+    const now = Date.now();
+    const elapsed = Math.floor((now - state.startTime) / 1000 / 60);
+    const island = state.island || 1;
+    if (r.v && state.minNotified === false) {
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后必定刷新');
+    } else {
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，剩余' + formatTime(Math.max(0, r.max - elapsed)));
+    }
+    return;
+  }
+
+  // Start timer
+  startTimer(r);
+}
+
+function startTimer(r) {
+  const timers = loadTimers();
+  const now = Date.now();
+  const island = islandSelections[r.id] || 1;
+
+  if (r.daily) {
+    // Daily reminder mode: next 0:00 or 12:00
+    timers[r.id] = {
+      startTime: now,
+      min: 0, max: 0,
+      minNotified: false, maxNotified: false,
+      variable: false, daily: true,
+      island: island,
+      lastDaily: null,
+    };
+    saveTimers(timers);
+    checkDailyTimers(r.id, timers[r.id]);
+    renderCards();
+    toast('⏱ ' + r.name + '（岛屿' + island + '）：每日0:00和12:00自动提醒');
+  } else {
+    timers[r.id] = {
+      startTime: now,
+      min: r.min,
+      max: r.max,
+      minNotified: false,
+      maxNotified: false,
+      variable: r.v || false,
+      island: island,
+    };
+    saveTimers(timers);
+    renderCards();
+    const label = r.v
+      ? formatTime(r.min) + '后"可能刷新"，' + formatTime(r.max) + '后"必定刷新"'
+      : formatTime(r.max) + '后通知你';
+    toast('⏱ ' + r.name + '（岛屿' + island + '）：' + label);
+  }
+
+  // Vibrate on mobile
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+
+function closeAllPopups() {
+  document.querySelectorAll('.island-popup.open').forEach(p => p.classList.remove('open'));
+}
+function selectIsland(rid, islandNum) {
+  islandSelections[rid] = islandNum;
+  const timers = loadTimers();
+  if (timers[rid]) {
+    timers[rid].island = islandNum;
+    saveTimers(timers);
+  }
+  renderCards();
+}
+
+function cancelTimer(resId) {
+  const timers = loadTimers();
+  delete timers[resId];
+  saveTimers(timers);
+  renderCards();
+}
+
+function resetAll() {
+  if (confirm('确定要重置所有计时吗？')) {
+    localStorage.removeItem(STORAGE_KEY);
+    renderCards();
+    toast('所有计时已重置');
+  }
+}
+
+// ====== 计时检查循环 ======
+let timerCheckInterval = null;
+
+function checkTimers() {
+  const timers = loadTimers();
+  const now = Date.now();
+  let changed = false;
+  const testMultiplier = testMode ? 60 : 1;
+
+  for (const rid of Object.keys(timers)) {
+    const t = timers[rid];
+    if (t.daily) { checkDailyTimers(parseInt(rid), t); continue; }
+    if (t.minNotified === true && t.maxNotified === true) continue;
+
+    const elapsedReal = (now - t.startTime) / 1000;
+    const elapsed = elapsedReal * testMultiplier;
+
+    const r = resources.find(x => x.id === parseInt(rid));
+    if (!r) continue;
+
+    const islandTag = '（岛屿' + (t.island || 1) + '）';
+    const minSec = Math.max(0, t.min * 60 - 5 * 60);
+    const maxSec = Math.max(0, t.max * 60 - 5 * 60);
+
+    // Check "可能刷新" (variable only, min < max)
+    if (t.variable && t.minNotified === false && elapsed >= minSec) {
+      t.minNotified = true;
+      changed = true;
+      notify(r.name + ' 可能已刷新', islandTag + ' 刷新范围下限将至（' + formatTime(t.min) + '），请留意地图');
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+    }
+
+    // Check "必定刷新" / "已刷新"
+    if (t.maxNotified === false && elapsed >= maxSec) {
+      if (t.minNotified === false) t.minNotified = true;
+      t.maxNotified = true;
+      changed = true;
+      if (t.variable) {
+        notify(r.name + ' 必定已刷新', islandTag + ' 已到最大刷新时间（' + formatTime(t.max) + '），物资已刷新！');
+      } else {
+        notify(r.name + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(t.max) + '）');
+      }
+      if (navigator.vibrate) navigator.vibrate([500, 100, 500, 100, 500]);
+    }
+  }
+
+  if (changed) {
+    saveTimers(timers);
+    renderCards();
+  }
+}
+
+// ====== Toast ======
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ====== 每日定时检查（远古花苞） ======
+function checkDailyTimers(rid, t) {
+  const now = new Date();
+  const islandTag = '（岛屿' + (t.island || 1) + '）';
+  const r = resources.find(x => x.id === rid);
+  if (!r) return;
+
+  const targets = [
+    { h: 0, m: 0, label: '0:00' },
+    { h: 12, m: 0, label: '12:00' },
+  ];
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let nextTarget = null;
+
+  for (const target of targets) {
+    const targetTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), target.h, target.m, 0);
+    const targetKey = today.toDateString() + '-' + target.label;
+
+    if (now >= targetTime && t.lastDaily !== targetKey) {
+      const timers = loadTimers();
+      if (timers[rid]) {
+        timers[rid].lastDaily = targetKey;
+        saveTimers(timers);
+        notify(r.name + ' 刷新提醒', islandTag + ' 每日' + target.label + ' 定时刷新时间到！');
+        if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+      }
+    }
+
+    if (targetTime > now) {
+      if (!nextTarget || targetTime < nextTarget) nextTarget = targetTime;
+    }
+  }
+
+  if (!nextTarget) {
+    nextTarget = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
+  }
+
+  const delay = nextTarget.getTime() - now.getTime() - 5 * 60 * 1000;
+  if (delay > 0) {
+    setTimeout(() => {
+      const timers = loadTimers();
+      if (timers[rid] && timers[rid].daily) {
+        checkDailyTimers(rid, timers[rid]);
+      }
+    }, Math.min(delay, 2147483647));
+  }
+}
+
+// ====== 测试模式 ======
+function toggleTestMode() {
+  testMode = !testMode;
+  document.getElementById('testLabel').textContent = testMode ? '开' : '关';
+  if (testMode) {
+    toast('测试模式：1分钟=1秒（倒计时会很快）');
+  } else {
+    toast('已恢复正常时间');
+  }
+  renderCards();
+}
+
+// ====== 轻量刷新倒计时 ======
+function refreshCountdowns() {
+  const timers = loadTimers();
+  const mult = testMode ? 60 : 1;
+  const cards = document.querySelectorAll('.card.running');
+  cards.forEach(card => {
+    const rid = parseInt(card.dataset.id);
+    const state = timers[rid];
+    if (!state || !state.startTime) return;
+    const r = resources.find(x => x.id === rid);
+    if (!r) return;
+
+    if (state.daily) {
+      const cdEl = card.querySelector('.countdown');
+      if (cdEl) { cdEl.textContent = '每日定时中'; cdEl.className = 'countdown'; }
+      return;
+    }
+
+    const elapsed = (Date.now() - state.startTime) / 1000 * mult;
+    const ADV = 5;
+    let nextCheckSec = Infinity;
+    if (state.minNotified === false && r.min !== r.max) {
+      nextCheckSec = Math.max(0, r.min * 60 - ADV * 60) - elapsed;
+      if (nextCheckSec <= 0) nextCheckSec = 0;
+    }
+    if (state.maxNotified === false) {
+      const maxSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+      if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
+      if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
+    }
+    if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+
+    const cdEl = card.querySelector('.countdown');
+    if (cdEl) {
+      if (nextCheckSec <= 0) {
+        cdEl.textContent = '已刷新';
+        cdEl.className = 'countdown expired-text';
+      } else {
+        cdEl.textContent = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        cdEl.className = 'countdown';
+      }
+    }
+  });
+}
+
+// ====== 初始化 ======
+function init() {
+  renderNav();
+  renderCards();
+
+  // Check notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    document.getElementById('permBanner').classList.add('show');
+  }
+  if ('Notification' in window && Notification.permission === 'granted') {
+    document.getElementById('permBanner').classList.remove('show');
+  }
+
+  // Start checking loop
+  timerCheckInterval = setInterval(checkTimers, MIN_CHECK_INTERVAL);
+  // Lightweight countdown refresh every second
+  setInterval(refreshCountdowns, 1000);
+
+  // Check immediately for timers that expired while away
+  checkTimers();
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// Wake lock to prevent phone from sleeping while page is open
+if ('wakeLock' in navigator) {
+  try {
+    navigator.wakeLock.request('screen').catch(() => {});
+  } catch(e) {}
+}
+</script>
+
+</body>
+</html>
