@@ -1334,11 +1334,11 @@ function initApp() {
     document.getElementById('iosGuide').classList.add('show');
   }
 
-  // Check notification permission
-  if ('Notification' in window && Notification.permission === 'default') {
+  // Show notification permission banner on iOS if not granted
+  if ('Notification' in window && Notification.permission !== 'granted') {
     document.getElementById('permBanner').classList.add('show');
   }
-  if ('Notification' in window && Notification.permission === 'granted') {
+  if (Notification.permission === 'granted') {
     document.getElementById('permBanner').classList.remove('show');
   }
 
