@@ -453,6 +453,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
+const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function deviceFingerprint() {
   const parts = [
@@ -1007,6 +1008,13 @@ function startTimer(r) {
       ? formatTime(r.min) + '后"可能刷新"，' + formatTime(r.max) + '后"必定刷新"'
       : formatTime(r.max) + '后通知你';
     toast('⏱ ' + r.name + '（岛屿' + island + '）：' + label);
+    // Schedule push for background notification
+    if (r.v) {
+      schedulePush(r.name + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * 60000);
+      schedulePush(r.name + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * 60000);
+    } else {
+      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * 60000);
+    }
   }
 
   // Vibrate on mobile
@@ -1041,6 +1049,12 @@ function startClone(rid, slot) {
   renderCards();
   toast('⏱ ' + r.name + ' 分身' + slot + '（岛屿' + island + '）');
   if (navigator.vibrate) navigator.vibrate(50);
+  if (r.v) {
+    schedulePush(r.name + ' 分身' + slot + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * 60000);
+    schedulePush(r.name + ' 分身' + slot + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * 60000);
+  } else {
+    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * 60000);
+  }
 }
 
 function closeAllPopups() {
@@ -1336,10 +1350,55 @@ function initApp() {
   // Check immediately for timers that expired while away
   checkTimers();
 
-  // Register service worker
+  // Register service worker and subscribe to push
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      subscribePush(reg);
+    }).catch(() => {});
   }
+}
+
+let pushSubscription = null;
+
+async function subscribePush(reg) {
+  if (!('PushManager' in window)) return;
+  try {
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
+    });
+    pushSubscription = sub;
+  } catch(e) { /* user denied or not supported */ }
+}
+
+function urlB64ToUint8(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function schedulePush(title, body, notifyAt) {
+  if (!pushSubscription || !SUPABASE_URL) return;
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/push_queue', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        endpoint: pushSubscription.endpoint,
+        p256dh: btoa(String.fromCharCode(...new Uint8Array(pushSubscription.getKey('p256dh')))),
+        auth: btoa(String.fromCharCode(...new Uint8Array(pushSubscription.getKey('auth')))),
+        notify_at: new Date(notifyAt).toISOString(),
+        title: title,
+        body: body,
+      }),
+    });
+  } catch(e) { /* ignore */ }
 }
 
 async function init() {
