@@ -974,16 +974,10 @@ function onCardClick(resId) {
   if (state && (state.minNotified === false || state.maxNotified === false)) {
     const elapsed = Math.floor((Date.now() - state.startTime) / 1000 / 60);
     const island = state.island || 1;
-    let msg = r.name + '（岛屿' + island + '）已计时' + formatTime(elapsed);
     if (r.v && state.minNotified === false) {
-      msg += '\n' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后必定刷新';
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后必定刷新');
     } else {
-      msg += '\n剩余' + formatTime(Math.max(0, r.max - elapsed));
-    }
-    msg += '\n\n要重新开始计时吗？';
-    if (confirm(msg)) {
-      cancelTimer(resId);
-      startTimer(r);
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，剩余' + formatTime(Math.max(0, r.max - elapsed)));
     }
     return;
   }
