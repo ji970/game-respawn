@@ -913,7 +913,7 @@ function startTimer(r) {
       minNotified: false, maxNotified: false,
       variable: false, daily: true,
       island: island,
-      lastDaily: null,
+      dailyNotified: {},
     };
     saveTimers(timers);
     checkDailyTimers(r.id, timers[r.id]);
@@ -1045,25 +1045,30 @@ function checkDailyTimers(rid, t) {
 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let nextTarget = null;
+  let changed = false;
+  const timers = loadTimers();
+  if (!timers[rid]) return;
+
+  // Init notified set if needed
+  if (!timers[rid].dailyNotified) timers[rid].dailyNotified = {};
 
   for (const target of targets) {
     const targetTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), target.h, target.m, 0);
     const targetKey = today.toDateString() + '-' + target.label;
 
-    if (now >= targetTime && t.lastDaily !== targetKey) {
-      const timers = loadTimers();
-      if (timers[rid]) {
-        timers[rid].lastDaily = targetKey;
-        saveTimers(timers);
-        notify(r.name + ' 刷新提醒', islandTag + ' 每日' + target.label + ' 定时刷新时间到！');
-        if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
-      }
+    if (now >= targetTime && !timers[rid].dailyNotified[targetKey]) {
+      timers[rid].dailyNotified[targetKey] = true;
+      changed = true;
+      notify(r.name + ' 刷新提醒', islandTag + ' 每日' + target.label + ' 定时刷新时间到！');
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
     }
 
     if (targetTime > now) {
       if (!nextTarget || targetTime < nextTarget) nextTarget = targetTime;
     }
   }
+
+  if (changed) saveTimers(timers);
 
   if (!nextTarget) {
     nextTarget = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
@@ -1072,9 +1077,9 @@ function checkDailyTimers(rid, t) {
   const delay = nextTarget.getTime() - now.getTime() - 5 * 60 * 1000;
   if (delay > 0) {
     setTimeout(() => {
-      const timers = loadTimers();
-      if (timers[rid] && timers[rid].daily) {
-        checkDailyTimers(rid, timers[rid]);
+      const t2 = loadTimers();
+      if (t2[rid] && t2[rid].daily) {
+        checkDailyTimers(rid, t2[rid]);
       }
     }, Math.min(delay, 2147483647));
   }
