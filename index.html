@@ -401,6 +401,17 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 // ====== 激活码验证 ======
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 
+function deviceFingerprint() {
+  const parts = [
+    screen.width + 'x' + screen.height,
+    navigator.language,
+    navigator.platform,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    navigator.hardwareConcurrency || '0',
+  ];
+  return parts.join('|');
+}
+
 async function hmacHex(message, secret) {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -424,6 +435,9 @@ async function checkActivation() {
   // Verify signature
   const expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
   if (act.sig !== expectedSig) return false;
+
+  // Check device binding
+  if (act.device && act.device !== deviceFingerprint()) return false;
 
   // Check expiry
   if (act.expiryHex === 'ffffffff') return true; // permanent
@@ -461,11 +475,12 @@ async function activate() {
     }
   }
 
-  // Save
+  // Save with device fingerprint
   localStorage.setItem('activation', JSON.stringify({
     expiryHex: expiryHex,
     sig: sig,
     activatedAt: Date.now(),
+    device: deviceFingerprint(),
   }));
 
   document.getElementById('lockScreen').classList.add('hidden');
