@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-title" content="刷新提醒">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>物资刷新提醒</title>
 <link rel="manifest" href="manifest.json">
 <style>
@@ -184,6 +186,41 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 }
 .permission-banner.show { display: block; }
 
+/* iOS install guide */
+.ios-guide {
+  display: none;
+  background: #1b1b2f;
+  border-bottom: 1px solid #7c4dff;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #e0e0e0;
+  line-height: 1.5;
+  position: relative;
+}
+.ios-guide.show { display: block; }
+.ios-guide .close-guide {
+  position: absolute;
+  right: 8px; top: 8px;
+  background: none; border: none;
+  color: var(--text2); font-size: 16px;
+  cursor: pointer; padding: 4px 8px;
+}
+.ios-guide .icon-share {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid #4fc3f7;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin: 0 3px;
+  position: relative;
+}
+.ios-guide .icon-share::after {
+  content: '↑';
+  position: absolute;
+  top: -8px; left: 3px;
+  font-size: 8px; color: #4fc3f7;
+}
+
 /* Reset all button */
 .toolbar {
   display: flex;
@@ -293,6 +330,11 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 
 <div class="permission-banner" id="permBanner" onclick="requestNotificationPermission()">
   📢 点击此处开启通知权限，刷新时提醒你
+</div>
+<div class="ios-guide" id="iosGuide">
+  <button class="close-guide" onclick="document.getElementById('iosGuide').classList.remove('show')">&times;</button>
+  📱 <b>添加到主屏幕才能接收通知：</b><br>
+  点下方 <span style="color:#4fc3f7">⎋ 分享</span> 按钮 → 往下滑 →「添加到主屏幕」
 </div>
 
 <nav id="nav"></nav>
@@ -440,6 +482,14 @@ function notify(title, body) {
       setTimeout(() => n.close(), 8000);
     } catch(e) { /* ignore */ }
   }
+  // Fallback: flash title bar so user notices even without notification permission
+  let count = 0;
+  const origTitle = document.title;
+  const flash = setInterval(() => {
+    document.title = (count % 2 === 0) ? '🔔 ' + title : origTitle;
+    count++;
+    if (count >= 6) { clearInterval(flash); document.title = origTitle; }
+  }, 800);
 }
 
 // ====== 渲染 ======
@@ -889,6 +939,15 @@ function refreshCountdowns() {
 function init() {
   renderNav();
   renderCards();
+
+  // iOS install guide (Safari, not in standalone mode)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = navigator.standalone ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && !isStandalone) {
+    document.getElementById('iosGuide').classList.add('show');
+  }
 
   // Check notification permission
   if ('Notification' in window && Notification.permission === 'default') {
