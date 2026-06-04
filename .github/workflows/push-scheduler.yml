@@ -1,16 +1,14 @@
 name: Push Notification Scheduler
 
 on:
-  push:
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/1 * * * *'
   workflow_dispatch:
 
 jobs:
   send-pushes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -24,51 +22,24 @@ jobs:
         run: |
           node -e "
           const webpush = require('web-push');
-          webpush.setVapidDetails(
-            'https://ji970.github.io/game-respawn/',
-            process.env.VAPID_PUBLIC,
-            process.env.VAPID_PRIVATE
-          );
-
+          webpush.setVapidDetails('https://ji970.github.io/game-respawn/', process.env.VAPID_PUBLIC, process.env.VAPID_PRIVATE);
           async function main() {
             const now = new Date().toISOString();
-            console.log('Checking at: ' + now);
-            const url = process.env.SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&notify_at=lte.' + now + '&limit=50';
-            console.log('Query: ' + url);
-            const res = await fetch(url, {
+            const res = await fetch(process.env.SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&notify_at=lte.' + now + '&limit=50', {
               headers: { apikey: process.env.SUPABASE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_KEY }
             });
             const pushes = await res.json();
-            console.log('Found: ' + JSON.stringify(pushes.length));
-            if (!Array.isArray(pushes) || pushes.length === 0) { console.log('No pending pushes'); return; }
-
+            if (!Array.isArray(pushes) || pushes.length === 0) { console.log('No pending'); return; }
+            console.log('Found ' + pushes.length + ' pushes');
             for (const p of pushes) {
-              console.log('Processing: ' + p.title + ' endpoint=' + p.endpoint.substring(0, 50));
               try {
-                const result = await webpush.sendNotification({
-                  endpoint: p.endpoint,
-                  keys: { p256dh: p.p256dh, auth: p.auth }
-                }, JSON.stringify({ title: p.title, body: p.body }));
-                console.log('Sent OK: ' + p.title + ' status=' + result.statusCode);
-                await fetch(
-                  process.env.SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id,
-                  {
-                    method: 'PATCH',
-                    headers: { apikey: process.env.SUPABASE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_KEY, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sent: true })
-                  }
-                );
+                await webpush.sendNotification({ endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } }, JSON.stringify({ title: p.title, body: p.body }));
+                await fetch(process.env.SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, { method: 'PATCH', headers: { apikey: process.env.SUPABASE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ sent: true }) });
+                console.log('Sent: ' + p.title);
               } catch(e) {
-                console.error('FAIL ' + p.title + ': ' + (e.body || e.message || e));
+                console.error('Fail: ' + p.title + ' - ' + e.message);
                 if (e.statusCode === 410 || e.statusCode === 404) {
-                  await fetch(
-                    process.env.SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id,
-                    { method: 'PATCH',
-                      headers: { apikey: process.env.SUPABASE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_KEY, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ sent: true })
-                    }
-                  );
-                  console.log('Marked expired as sent');
+                  await fetch(process.env.SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, { method: 'PATCH', headers: { apikey: process.env.SUPABASE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ sent: true }) });
                 }
               }
             }
