@@ -1009,11 +1009,12 @@ function startTimer(r) {
       : formatTime(r.max) + '后通知你';
     toast('⏱ ' + r.name + '（岛屿' + island + '）：' + label);
     // Schedule push for background notification
+    const msPerMin = testMode ? 1000 : 60000;
     if (r.v) {
-      schedulePush(r.name + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * 60000);
-      schedulePush(r.name + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * 60000);
+      schedulePush(r.name + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * msPerMin);
+      schedulePush(r.name + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
     } else {
-      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * 60000);
+      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin);
     }
   }
 
@@ -1049,11 +1050,12 @@ function startClone(rid, slot) {
   renderCards();
   toast('⏱ ' + r.name + ' 分身' + slot + '（岛屿' + island + '）');
   if (navigator.vibrate) navigator.vibrate(50);
+  const msPerMin = testMode ? 1000 : 60000;
   if (r.v) {
-    schedulePush(r.name + ' 分身' + slot + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * 60000);
-    schedulePush(r.name + ' 分身' + slot + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * 60000);
+    schedulePush(r.name + ' 分身' + slot + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * msPerMin);
+    schedulePush(r.name + ' 分身' + slot + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
   } else {
-    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * 60000);
+    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin);
   }
 }
 
