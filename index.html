@@ -812,13 +812,38 @@ function renderCards() {
 
   main.innerHTML = `<div class="grid">${items.map(r => {
     const state = timers[r.id];
-    const isRunning = state && (state.minNotified === false || state.maxNotified === false);
-    const isExpired = state && state.minNotified === true && state.maxNotified === true;
+    const hasActiveClone = state && state.clones &&
+      Object.values(state.clones).some(c => c && (c.minNotified === false || c.maxNotified === false));
+    const mainRunning = state && (state.minNotified === false || state.maxNotified === false);
+    const isRunning = mainRunning || hasActiveClone;
+    const isExpired = state && state.minNotified === true && state.maxNotified === true && !hasActiveClone;
     const cls = isExpired ? 'expired' : (isRunning ? 'running' : 'idle');
 
     let countdownHtml = '';
     let countdownCls = '';
-    if (isRunning && state.startTime) {
+    if (!mainRunning && hasActiveClone) {
+      // Only clones running — show nearest clone countdown
+      const mult = testMode ? 60 : 1;
+      let nearest = Infinity;
+      [1,2,3].forEach(s => {
+        const c = state.clones && state.clones[s];
+        if (c && (c.minNotified === false || c.maxNotified === false)) {
+          const el = (Date.now() - c.startTime) / 1000 * mult;
+          const adv = 2;
+          let sec = c.max * 60 - adv * 60 - el;
+          if (c.variable && c.minNotified === false) {
+            sec = Math.min(sec, c.min * 60 - adv * 60 - el);
+          }
+          if (sec < nearest) nearest = sec;
+        }
+      });
+      if (nearest <= 0) {
+        countdownHtml = '分身已刷新';
+        countdownCls = 'expired-text';
+      } else {
+        countdownHtml = '⏳ 分身 ' + formatCountdown(Math.ceil(nearest));
+      }
+    } else if (isRunning && state.startTime) {
       const now = Date.now();
       const mult = testMode ? 60 : 1;
       const elapsed = (now - state.startTime) / 1000 * mult;
