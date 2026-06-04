@@ -1378,6 +1378,15 @@ function urlB64ToUint8(base64String) {
   return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
 }
 
+function arrayBufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 async function schedulePush(title, body, notifyAt) {
   if (!pushSubscription || !SUPABASE_URL) return;
   try {
@@ -1391,8 +1400,8 @@ async function schedulePush(title, body, notifyAt) {
       },
       body: JSON.stringify({
         endpoint: pushSubscription.endpoint,
-        p256dh: btoa(String.fromCharCode(...new Uint8Array(pushSubscription.getKey('p256dh')))),
-        auth: btoa(String.fromCharCode(...new Uint8Array(pushSubscription.getKey('auth')))),
+        p256dh: arrayBufferToBase64Url(pushSubscription.getKey('p256dh')),
+        auth: arrayBufferToBase64Url(pushSubscription.getKey('auth')),
         notify_at: new Date(notifyAt).toISOString(),
         title: title,
         body: body,
