@@ -1353,7 +1353,8 @@ function initApp() {
   // Register service worker and subscribe to push
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(reg => {
-      subscribePush(reg);
+      // Wait for SW to be ready before subscribing
+      navigator.serviceWorker.ready.then(() => subscribePush(reg));
     }).catch(() => {});
   }
 }
@@ -1363,12 +1364,23 @@ let pushSubscription = null;
 async function subscribePush(reg) {
   if (!('PushManager' in window)) return;
   try {
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
-    });
+    // Must have notification permission first
+    if (Notification.permission !== 'granted') {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') return;
+    }
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
+      });
+    }
     pushSubscription = sub;
-  } catch(e) { /* user denied or not supported */ }
+    document.getElementById('permBanner').classList.remove('show');
+  } catch(e) {
+    document.getElementById('permBanner').classList.add('show');
+  }
 }
 
 function urlB64ToUint8(base64String) {
