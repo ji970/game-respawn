@@ -972,13 +972,7 @@ function onCardClick(resId) {
     return;
   }
   if (state && (state.minNotified === false || state.maxNotified === false)) {
-    const elapsed = Math.floor((Date.now() - state.startTime) / 1000 / 60);
-    const island = state.island || 1;
-    if (r.v && state.minNotified === false) {
-      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后必定刷新');
-    } else {
-      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，剩余' + formatTime(Math.max(0, r.max - elapsed)));
-    }
+    cancelTimer(resId);
     return;
   }
 
@@ -1081,7 +1075,16 @@ function cancelTimer(resId, cloneSlot) {
       timers[resId].clones[cloneSlot] = null;
     }
   } else {
-    delete timers[resId];
+    // Stop main timer but keep clones if any
+    if (timers[resId] && timers[resId].clones) {
+      const clones = timers[resId].clones;
+      timers[resId] = { clones: clones };
+      // If no active clones, remove entirely
+      const hasActive = Object.values(clones).some(c => c && (c.minNotified === false || c.maxNotified === false));
+      if (!hasActive) delete timers[resId];
+    } else {
+      delete timers[resId];
+    }
   }
   saveTimers(timers);
   renderCards();
