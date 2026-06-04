@@ -301,6 +301,44 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   margin-top: 3px;
 }
 
+/* Lock screen */
+.lock-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: #0f0f1a;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.lock-overlay.hidden { display: none; }
+.lock-box {
+  text-align: center; max-width: 320px; width: 100%;
+}
+.lock-box h2 { font-size: 22px; margin-bottom: 4px; }
+.lock-box .lock-sub {
+  font-size: 13px; color: var(--text2); margin-bottom: 20px;
+}
+.lock-box input {
+  width: 100%; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 18px; text-align: center;
+  font-family: monospace; letter-spacing: 2px;
+}
+.lock-box input:focus { outline: none; border-color: var(--accent); }
+.lock-box button {
+  width: 100%; padding: 14px; margin-top: 14px;
+  border-radius: 10px; border: none; background: var(--accent);
+  color: #000; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.lock-box button:active { background: #29b6f6; }
+.lock-error { color: var(--danger); font-size: 12px; margin-top: 10px; min-height: 18px; }
+.lock-footer {
+  margin-top: 20px; font-size: 11px; color: var(--text2);
+}
+.lock-status {
+  display: none; font-size: 10px; color: var(--success);
+  text-align: center; padding: 2px 8px;
+}
+.lock-status.show { display: block; }
+
 /* Toast */
 .toast {
   position: fixed;
@@ -323,9 +361,21 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 </head>
 <body>
 
+<div class="lock-overlay" id="lockScreen">
+  <div class="lock-box">
+    <h2>物资刷新提醒</h2>
+    <div class="lock-sub">请输入激活码解锁</div>
+    <input type="text" id="codeInput" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off">
+    <button onclick="activate()">激活</button>
+    <div class="lock-error" id="lockError"></div>
+    <div class="lock-footer">购买激活码请联系管理员</div>
+  </div>
+</div>
+
 <header>
   <h1>物资刷新提醒</h1>
   <div class="sub">点击物资图标开始倒计时</div>
+  <div class="lock-status" id="lockStatus"></div>
 </header>
 
 <div class="permission-banner" id="permBanner" onclick="requestNotificationPermission()">
@@ -348,6 +398,94 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 <div class="toast" id="toast"></div>
 
 <script>
+// ====== 激活码验证 ======
+const ACTIVATION_SECRET = 'my-respawn-secret-2026'; // 和 keygen.html 保持一致
+
+async function hmacHex(message, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+  return Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getActivation() {
+  try { return JSON.parse(localStorage.getItem('activation')); }
+  catch(e) { return null; }
+}
+
+async function checkActivation() {
+  const act = getActivation();
+  if (!act || !act.expiryHex || !act.sig) return false;
+
+  // Verify signature
+  const expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  if (act.sig !== expectedSig) return false;
+
+  // Check expiry
+  if (act.expiryHex === 'ffffffff') return true; // permanent
+  const expiry = parseInt(act.expiryHex, 16) * 1000;
+  if (Date.now() > expiry) return false;
+
+  return true;
+}
+
+async function activate() {
+  const input = document.getElementById('codeInput').value.replace(/-/g, '').trim();
+  const errEl = document.getElementById('lockError');
+
+  if (input.length !== 16 || !/^[0-9a-fA-F]+$/.test(input)) {
+    errEl.textContent = '激活码格式不正确';
+    return;
+  }
+
+  const expiryHex = input.slice(0, 8);
+  const sig = input.slice(8, 16);
+
+  // Verify signature
+  const expectedSig = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  if (sig !== expectedSig) {
+    errEl.textContent = '激活码无效';
+    return;
+  }
+
+  // Check not expired
+  if (expiryHex !== 'ffffffff') {
+    const expiry = parseInt(expiryHex, 16) * 1000;
+    if (Date.now() > expiry) {
+      errEl.textContent = '激活码已过期';
+      return;
+    }
+  }
+
+  // Save
+  localStorage.setItem('activation', JSON.stringify({
+    expiryHex: expiryHex,
+    sig: sig,
+    activatedAt: Date.now(),
+  }));
+
+  document.getElementById('lockScreen').classList.add('hidden');
+  updateStatus();
+  initApp();
+}
+
+function updateStatus() {
+  const act = getActivation();
+  const el = document.getElementById('lockStatus');
+  if (!act) return;
+  if (act.expiryHex === 'ffffffff') {
+    el.textContent = '已激活（永久）';
+  } else {
+    const remaining = Math.ceil((parseInt(act.expiryHex, 16) * 1000 - Date.now()) / 86400000);
+    el.textContent = '已激活（剩余' + remaining + '天）';
+  }
+  el.classList.add('show');
+}
+
 // ====== 物资数据 ======
 const resources = [
   // 农作物
@@ -936,7 +1074,7 @@ function refreshCountdowns() {
 }
 
 // ====== 初始化 ======
-function init() {
+function initApp() {
   renderNav();
   renderCards();
 
@@ -968,6 +1106,15 @@ function init() {
   // Register service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+async function init() {
+  const valid = await checkActivation();
+  if (valid) {
+    document.getElementById('lockScreen').classList.add('hidden');
+    updateStatus();
+    initApp();
   }
 }
 
