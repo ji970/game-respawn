@@ -301,6 +301,57 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   margin-top: 3px;
 }
 
+
+/* Clone button */
+.clone-btn {
+  position: absolute;
+  bottom: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 14px; line-height: 18px;
+  cursor: pointer; padding: 0;
+  display: none;
+}
+.card.running .clone-btn { display: block; }
+.clone-popup {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 21;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+.clone-popup.open { display: flex; gap: 4px; }
+.clone-popup button {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.clone-popup button:active { background: var(--accent); color: #000; }
+.clone-popup button.busy { border-color: var(--accent2); color: var(--accent2); }
+.clone-dots {
+  display: flex; gap: 2px; justify-content: center; margin-top: 3px;
+}
+.clone-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent2);
+  display: none;
+}
+.clone-dot.active { display: block; }
+
 /* Lock screen */
 .lock-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -824,6 +875,22 @@ function renderCards() {
         ${dailyBadge}
         <div class="countdown ${countdownCls}">${countdownHtml}</div>
         ${islandHtml}
+        <button class="clone-btn" data-rid="${r.id}">+</button>
+        <div class="clone-popup" data-rid="${r.id}">
+          ${[1,2,3].map(n => {
+            const clone = state && state.clones && state.clones[n];
+            const busy = clone && (clone.minNotified === false || clone.maxNotified === false);
+            const text = busy ? n + ' ⏳' : (clone ? n + ' ✓' : n);
+            return '<button class="'+(busy?'busy':'')+'" data-slot="'+n+'">'+text+'</button>';
+          }).join('')}
+        </div>
+        <div class="clone-dots">
+          ${[1,2,3].map(n => {
+            const clone = state && state.clones && state.clones[n];
+            const active = clone && (clone.minNotified === false || clone.maxNotified === false);
+            return '<div class="clone-dot'+(active?' active':'')+'"></div>';
+          }).join('')}
+        </div>
       </div>`;
   }).join('')}</div>`;
 
@@ -860,10 +927,30 @@ function renderCards() {
     });
   });
   // Close popups when tapping outside
+  // Clone button events
+  main.querySelectorAll('.clone-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(btn.dataset.rid);
+      const popup = btn.parentElement.querySelector('.clone-popup');
+      const wasOpen = popup.classList.contains('open');
+      closeAllPopups();
+      if (!wasOpen) popup.classList.add('open');
+    });
+  });
+  main.querySelectorAll('.clone-popup button').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(b.parentElement.dataset.rid);
+      const slot = parseInt(b.dataset.slot);
+      startClone(rid, slot);
+      closeAllPopups();
+    });
+  });
   if (!document._popupListener) {
     document._popupListener = true;
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.island-wrap')) closeAllPopups();
+      if (!e.target.closest('.island-wrap') && !e.target.closest('.clone-btn') && !e.target.closest('.clone-popup')) closeAllPopups();
     });
   }
 }
@@ -946,8 +1033,42 @@ function startTimer(r) {
   if (navigator.vibrate) navigator.vibrate(50);
 }
 
+function startClone(rid, slot) {
+  const r = resources.find(x => x.id === rid);
+  const timers = loadTimers();
+  if (!timers[rid]) timers[rid] = {};
+  if (!timers[rid].clones) timers[rid].clones = {};
+
+  const existing = timers[rid].clones[slot];
+  const isRunning = existing && (existing.minNotified === false || existing.maxNotified === false);
+
+  if (isRunning) {
+    const elapsed = Math.floor((Date.now() - existing.startTime) / 1000 / 60);
+    if (confirm(r.name + ' 分身' + slot + '\n已计时' + formatTime(elapsed) + '\n\n重新开始？')) {
+      timers[rid].clones[slot] = null;
+    } else {
+      return;
+    }
+  }
+
+  const island = islandSelections[rid] || 1;
+  timers[rid].clones[slot] = {
+    startTime: Date.now(),
+    min: r.min, max: r.max,
+    minNotified: false, maxNotified: false,
+    variable: r.v || false,
+    island: island,
+  };
+
+  saveTimers(timers);
+  renderCards();
+  toast('⏱ ' + r.name + ' 分身' + slot + '（岛屿' + island + '）');
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+
 function closeAllPopups() {
   document.querySelectorAll('.island-popup.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.clone-popup.open').forEach(p => p.classList.remove('open'));
 }
 function selectIsland(rid, islandNum) {
   islandSelections[rid] = islandNum;
@@ -959,9 +1080,15 @@ function selectIsland(rid, islandNum) {
   renderCards();
 }
 
-function cancelTimer(resId) {
+function cancelTimer(resId, cloneSlot) {
   const timers = loadTimers();
-  delete timers[resId];
+  if (cloneSlot) {
+    if (timers[resId] && timers[resId].clones) {
+      timers[resId].clones[cloneSlot] = null;
+    }
+  } else {
+    delete timers[resId];
+  }
   saveTimers(timers);
   renderCards();
 }
@@ -969,6 +1096,7 @@ function cancelTimer(resId) {
 function resetAll() {
   if (confirm('确定要重置所有计时吗？')) {
     localStorage.removeItem(STORAGE_KEY);
+    closeAllPopups();
     renderCards();
     toast('所有计时已重置');
   }
@@ -1017,6 +1145,38 @@ function checkTimers() {
         notify(r.name + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(t.max) + '）');
       }
       if (navigator.vibrate) navigator.vibrate([500, 100, 500, 100, 500]);
+    }
+  }
+
+  // Check clones
+  for (const rid of Object.keys(timers)) {
+    const t = timers[rid];
+    if (!t.clones) continue;
+    for (const slot of [1,2,3]) {
+      const c = t.clones[slot];
+      if (!c || (c.minNotified === true && c.maxNotified === true)) continue;
+      const elapsedReal = (now - c.startTime) / 1000;
+      const elapsed = elapsedReal * testMultiplier;
+      const r = resources.find(x => x.id === parseInt(rid));
+      if (!r) continue;
+      const islandTag = '（岛屿' + (c.island || 1) + '）';
+      const minSec = Math.max(0, c.min * 60 - 2 * 60);
+      const maxSec = Math.max(0, c.max * 60 - 2 * 60);
+      if (c.variable && c.minNotified === false && elapsed >= minSec) {
+        c.minNotified = true; changed = true;
+        notify(r.name + ' 分身' + slot + ' 可能已刷新', islandTag + ' 刷新范围下限将至（' + formatTime(c.min) + '）');
+        if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+      }
+      if (c.maxNotified === false && elapsed >= maxSec) {
+        if (c.minNotified === false) c.minNotified = true;
+        c.maxNotified = true; changed = true;
+        if (c.variable) {
+          notify(r.name + ' 分身' + slot + ' 必定已刷新', islandTag + ' 已到最大刷新时间（' + formatTime(c.max) + '）');
+        } else {
+          notify(r.name + ' 分身' + slot + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(c.max) + '）');
+        }
+        if (navigator.vibrate) navigator.vibrate([500, 100, 500, 100, 500]);
+      }
     }
   }
 
@@ -1143,6 +1303,19 @@ function refreshCountdowns() {
         cdEl.textContent = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
         cdEl.className = 'countdown';
       }
+    }
+
+    // Update clone dots
+    if (state.clones) {
+      const dots = card.querySelectorAll('.clone-dot');
+      [1,2,3].forEach(slot => {
+        const c = state.clones[slot];
+        const active = c && (c.minNotified === false || c.maxNotified === false);
+        if (dots[slot-1]) {
+          if (active) dots[slot-1].classList.add('active');
+          else dots[slot-1].classList.remove('active');
+        }
+      });
     }
   });
 }
