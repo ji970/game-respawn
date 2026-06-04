@@ -908,7 +908,12 @@ function renderCards() {
   main.querySelectorAll('.cancel-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      cancelTimer(parseInt(btn.dataset.id));
+      const rid = parseInt(btn.dataset.id);
+      const timers = loadTimers();
+      delete timers[rid];
+      saveTimers(timers);
+      toast(resources.find(x => x.id === rid)?.name + ' 所有计时已关闭');
+      renderCards();
     });
   });
   main.querySelectorAll('.island-btn').forEach(btn => {
