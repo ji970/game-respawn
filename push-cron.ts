@@ -58,9 +58,8 @@ async function checkAndSend() {
   }
 }
 
-// Check immediately on startup
-checkAndSend();
-// Then every 60 seconds
-setInterval(checkAndSend, 60000);
-
-Deno.serve(() => new Response("OK"));
+// Run check on every HTTP request (for external cron pings)
+Deno.serve(async () => {
+  await checkAndSend();
+  return new Response("Sent");
+});
