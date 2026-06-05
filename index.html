@@ -551,13 +551,16 @@ async function activate() {
       const existing = await checkRes.json();
 
       if (existing.length > 0 && existing[0].device !== device) {
-        errEl.textContent = '此激活码已在其他设备使用';
-        btn.disabled = false; btn.textContent = '激活';
-        return;
+        // Allow re-activation in different browser (WeChat → system browser)
+        // Only block if more than 2 devices already used this code
+        if (existing.length >= 2) {
+          errEl.textContent = '此激活码已在其他设备使用';
+          btn.disabled = false; btn.textContent = '激活';
+          return;
+        }
       }
 
-      if (existing.length === 0) {
-        // Claim this code
+      if (existing.length === 0 || (existing.length === 1 && existing[0].device !== device)) {
         await fetch(SUPABASE_URL + '/rest/v1/activations', {
           method: 'POST',
           headers: {
@@ -1439,17 +1442,6 @@ async function schedulePush(title, body, notifyAt) {
 }
 
 async function init() {
-  // Block in-app browsers to prevent dual activation
-  const ua = navigator.userAgent;
-  if (/MicroMessenger|QQ\//i.test(ua) && !navigator.standalone) {
-    document.getElementById('lockScreen').innerHTML =
-      '<div class="lock-box"><h2>物资刷新提醒</h2>' +
-      '<div class="lock-sub" style="color:#ef5350">⚠️ 请用系统浏览器打开</div>' +
-      '<p style="font-size:13px;color:var(--text2);margin:16px 0">微信/QQ 内无法正常使用</p>' +
-      '<p style="font-size:13px;color:var(--text2)">点右上角 <b style="color:#4fc3f7">···</b> →「<b style="color:#4fc3f7">在浏览器中打开</b>」</p></div>';
-    return;
-  }
-
   const valid = await checkActivation();
   if (valid) {
     document.getElementById('lockScreen').classList.add('hidden');
