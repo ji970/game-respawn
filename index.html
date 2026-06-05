@@ -484,12 +484,16 @@ async function checkActivation() {
   const act = getActivation();
   if (!act || !act.expiryHex || !act.sig) return false;
 
-  // Verify signature
-  const expectedSig = (await hmacHex(act.expiryHex + (act.nonce || ''), ACTIVATION_SECRET)).slice(0, 4);
+  // Verify signature (supports both old 8+8 and new 8+4+4 formats)
+  let expectedSig;
+  if (act.nonce !== undefined) {
+    expectedSig = (await hmacHex(act.expiryHex + act.nonce, ACTIVATION_SECRET)).slice(0, 4);
+  } else {
+    expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  }
   if (act.sig !== expectedSig) return false;
 
-  // Check device binding (local fingerprint)
-  if (act.device && act.device !== getDeviceId()) return false;
+  // Skip device check to avoid legacy fingerprint mismatches (Supabase enforces one-code-one-device)
 
   // Check expiry
   if (act.expiryHex === 'ffffffff') return true; // permanent
