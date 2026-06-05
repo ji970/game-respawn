@@ -487,7 +487,7 @@ async function checkActivation() {
   if (!act || !act.expiryHex || !act.sig) return false;
 
   // Verify signature
-  const expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  const expectedSig = (await hmacHex(act.expiryHex + (act.nonce || ''), ACTIVATION_SECRET)).slice(0, 4);
   if (act.sig !== expectedSig) return false;
 
   // Check device binding (local fingerprint)
@@ -514,10 +514,11 @@ async function activate() {
   }
 
   const expiryHex = input.slice(0, 8);
-  const sig = input.slice(8, 16);
+  const nonce = input.slice(8, 12);
+  const sig = input.slice(12, 16);
 
   // Verify signature
-  const expectedSig = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  const expectedSig = (await hmacHex(expiryHex + nonce, ACTIVATION_SECRET)).slice(0, 4);
   if (sig !== expectedSig) {
     errEl.textContent = '激活码无效';
     btn.disabled = false; btn.textContent = '激活';
@@ -579,6 +580,7 @@ async function activate() {
   // Save locally
   localStorage.setItem('activation', JSON.stringify({
     expiryHex: expiryHex,
+    nonce: nonce,
     sig: sig,
     activatedAt: Date.now(),
     device: device,
