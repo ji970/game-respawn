@@ -1,5 +1,4 @@
 // Deploy to Deno Deploy (dash.deno.com) - free, no credit card
-// Uses setInterval to check every 60 seconds
 
 import webpush from "npm:web-push@3.6.7";
 
@@ -21,6 +20,7 @@ async function checkAndSend() {
 
     const now = Date.now();
     const due = data.filter((p: any) => new Date(p.notify_at).getTime() <= now);
+    if (due.length === 0) return;
 
     for (const p of due) {
       try {
@@ -58,8 +58,8 @@ async function checkAndSend() {
   }
 }
 
-// Run check on every HTTP request (for external cron pings)
-Deno.serve(async () => {
-  await checkAndSend();
-  return new Response("Sent");
-});
+// Built-in cron - runs every minute
+Deno.cron("push-scheduler", "* * * * *", checkAndSend);
+
+// HTTP handler for manual testing
+Deno.serve(() => new Response("OK"));
