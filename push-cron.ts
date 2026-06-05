@@ -1,5 +1,5 @@
 // Deploy to Deno Deploy (dash.deno.com) - free, no credit card
-// Set up a cron job: * * * * * (every minute)
+// Uses setInterval to check every 60 seconds
 
 import webpush from "npm:web-push@3.6.7";
 
@@ -10,20 +10,19 @@ const SUPABASE_KEY = "sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l";
 
 webpush.setVapidDetails("https://ji970.github.io/game-respawn/", VAPID_PUBLIC, VAPID_PRIVATE);
 
-// Cron handler
-Deno.cron("push-scheduler", "* * * * *", async () => {
+async function checkAndSend() {
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/push_queue?sent=eq.false&limit=50`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
-    let pushes = await res.json();
-    if (!Array.isArray(pushes) || pushes.length === 0) return;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return;
 
     const now = Date.now();
-    pushes = pushes.filter((p: any) => new Date(p.notify_at).getTime() <= now);
+    const due = data.filter((p: any) => new Date(p.notify_at).getTime() <= now);
 
-    for (const p of pushes) {
+    for (const p of due) {
       try {
         await webpush.sendNotification(
           { endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } },
@@ -38,7 +37,9 @@ Deno.cron("push-scheduler", "* * * * *", async () => {
           },
           body: JSON.stringify({ sent: true }),
         });
-      } catch (e) {
+        console.log("Sent:", p.title);
+      } catch (e: any) {
+        console.error("Fail:", e.message);
         if (e.statusCode === 410 || e.statusCode === 404) {
           await fetch(`${SUPABASE_URL}/rest/v1/push_queue?id=eq.${p.id}`, {
             method: "PATCH",
@@ -52,10 +53,14 @@ Deno.cron("push-scheduler", "* * * * *", async () => {
         }
       }
     }
-  } catch (_) {
-    // ignore
+  } catch (e: any) {
+    console.error("Error:", e.message);
   }
-});
+}
 
-// HTTP handler (for testing)
+// Check immediately on startup
+checkAndSend();
+// Then every 60 seconds
+setInterval(checkAndSend, 60000);
+
 Deno.serve(() => new Response("OK"));
