@@ -1336,6 +1336,16 @@ function initApp() {
     document.getElementById('iosGuide').classList.add('show');
   }
 
+  // In-app browser guide (WeChat, QQ, etc.)
+  const ua = navigator.userAgent;
+  const isInApp = /MicroMessenger|QQ\//i.test(ua) && !isStandalone;
+  if (isInApp) {
+    const guide = document.getElementById('iosGuide');
+    guide.innerHTML = '<button class="close-guide" onclick="document.getElementById(\'iosGuide\').classList.remove(\'show\')">&times;</button>' +
+      '⚠️ <b>请用系统浏览器打开：</b><br>点右上角 <b>···</b> →「在浏览器中打开」→ 再添加到主屏幕';
+    guide.classList.add('show');
+  }
+
   // Show notification permission banner on iOS if not granted
   if ('Notification' in window && Notification.permission !== 'granted') {
     document.getElementById('permBanner').classList.add('show');
