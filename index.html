@@ -1314,11 +1314,11 @@ function refreshCountdowns() {
       if (nextCheckSec <= 0) nextCheckSec = 0;
     }
     if (state.maxNotified === false) {
-      const maxSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+      const maxSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
       if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
       if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
     }
-    if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+    if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
 
     const cdEl = card.querySelector('.countdown');
     if (cdEl) {
