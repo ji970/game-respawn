@@ -1476,15 +1476,6 @@ if ('wakeLock' in navigator) {
   } catch(e) {}
 }
 
-// Catch up on missed notifications when app comes back to foreground
-let lastVisibleTime = Date.now();
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    lastVisibleTime = Date.now();
-    // Run check immediately to catch any missed timers
-    setTimeout(checkTimers, 500);
-  }
-});
 </script>
 
 </body>
