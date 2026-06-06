@@ -830,16 +830,16 @@ function renderCards() {
         countdownHtml = '每日定时中';
       } else {
       const ADV = 2;
-      if (state.minNotified === false && r.min !== r.max) {
-        nextCheckSec = Math.max(0, r.min * 60 - ADV * 60) - elapsed;
+      if (state.minNotified === false && (state.variable || state.min !== state.max)) {
+        nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
         if (nextCheckSec <= 0) nextCheckSec = 0;
       }
       if (state.maxNotified === false) {
-        const maxSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+        const maxSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
         if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
         if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
       }
-      if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
+      if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
       if (nextCheckSec <= 0) {
         countdownHtml = '已刷新';
         countdownCls = 'expired-text';
@@ -1309,8 +1309,8 @@ function refreshCountdowns() {
     const elapsed = (Date.now() - state.startTime) / 1000 * mult;
     const ADV = 2;
     let nextCheckSec = Infinity;
-    if (state.minNotified === false && r.min !== r.max) {
-      nextCheckSec = Math.max(0, r.min * 60 - ADV * 60) - elapsed;
+    if (state.minNotified === false && (state.variable || state.min !== state.max)) {
+      nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
       if (nextCheckSec <= 0) nextCheckSec = 0;
     }
     if (state.maxNotified === false) {
