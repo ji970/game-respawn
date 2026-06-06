@@ -1028,7 +1028,7 @@ function startTimer(r) {
     const msPerMin = testMode ? 1000 : 60000;
     if (r.v) {
       schedulePush(r.name + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * msPerMin);
-      schedulePush(r.name + ' 刷新已结束', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
+      schedulePush(r.name + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
     } else {
       schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin);
     }
@@ -1069,7 +1069,7 @@ function startClone(rid, slot) {
   const msPerMin = testMode ? 1000 : 60000;
   if (r.v) {
     schedulePush(r.name + ' 分身' + slot + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * msPerMin);
-    schedulePush(r.name + ' 分身' + slot + ' 刷新已结束', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
+    schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
   } else {
     schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin);
   }
@@ -1158,7 +1158,7 @@ function checkTimers() {
       t.maxNotified = true;
       changed = true;
       if (t.variable) {
-        notify(r.name + ' 刷新已结束', islandTag + ' 已到最大刷新时间（' + formatTime(t.max) + '），物资已刷新！');
+        notify(r.name + ' 已停止刷新', islandTag + ' 已到最大刷新时间（' + formatTime(t.max) + '），物资已刷新！');
       } else {
         notify(r.name + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(t.max) + '）');
       }
@@ -1189,7 +1189,7 @@ function checkTimers() {
         if (c.minNotified === false) c.minNotified = true;
         c.maxNotified = true; changed = true;
         if (c.variable) {
-          notify(r.name + ' 分身' + slot + ' 刷新已结束', islandTag + ' 已到最大刷新时间（' + formatTime(c.max) + '）');
+          notify(r.name + ' 分身' + slot + ' 已停止刷新', islandTag + ' 已到最大刷新时间（' + formatTime(c.max) + '）');
         } else {
           notify(r.name + ' 分身' + slot + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(c.max) + '）');
         }
