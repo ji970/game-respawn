@@ -878,7 +878,7 @@ function renderCards() {
         ${islandHtml}
         <button class="clone-btn" data-rid="${r.id}">+</button>
         <div class="clone-popup" data-rid="${r.id}">
-          ${[1,2,3].map(n => {
+          ${[1,2,3,4,5].map(n => {
             const clone = state && state.clones && state.clones[n];
             const busy = clone && (clone.minNotified === false || clone.maxNotified === false);
             const text = busy ? n + ' ⏳' : (clone ? n + ' ✓' : n);
@@ -886,7 +886,7 @@ function renderCards() {
           }).join('')}
         </div>
         <div class="clone-dots">
-          ${[1,2,3].map(n => {
+          ${[1,2,3,4,5].map(n => {
             const clone = state && state.clones && state.clones[n];
             const active = clone && (clone.minNotified === false || clone.maxNotified === false);
             return '<div class="clone-dot'+(active?' active':'')+'"></div>';
@@ -1170,7 +1170,7 @@ function checkTimers() {
   for (const rid of Object.keys(timers)) {
     const t = timers[rid];
     if (!t.clones) continue;
-    for (const slot of [1,2,3]) {
+    for (const slot of [1,2,3,4,5]) {
       const c = t.clones[slot];
       if (!c || (c.minNotified === true && c.maxNotified === true)) continue;
       const elapsedReal = (now - c.startTime) / 1000;
@@ -1326,7 +1326,7 @@ function refreshCountdowns() {
     // Update clone dots
     if (state.clones) {
       const dots = card.querySelectorAll('.clone-dot');
-      [1,2,3].forEach(slot => {
+      [1,2,3,4,5].forEach(slot => {
         const c = state.clones[slot];
         const active = c && (c.minNotified === false || c.maxNotified === false);
         if (dots[slot-1]) {
