@@ -3,7 +3,7 @@ name: Push Scheduler
 on:
   push:
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -15,10 +15,14 @@ jobs:
         with:
           node-version: 22
       - run: npm install web-push
-      - name: Send due pushes
+      - name: Check every 60s
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-        run: node send-pushes.js
+        run: |
+          for i in 1 2 3 4 5; do
+            node send-pushes.js
+            [ $i -lt 5 ] && sleep 60
+          done
