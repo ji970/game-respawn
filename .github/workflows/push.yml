@@ -1,7 +1,6 @@
 name: Push Scheduler
 
 on:
-  push:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
