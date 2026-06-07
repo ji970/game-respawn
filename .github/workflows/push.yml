@@ -20,4 +20,8 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-        run: node send-pushes.js
+        run: |
+          for i in 1 2 3 4 5; do
+            node send-pushes.js
+            [ $i -lt 5 ] && sleep 60
+          done
