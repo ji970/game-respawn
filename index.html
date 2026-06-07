@@ -1484,6 +1484,11 @@ async function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
+// For Android without push support: catch up when app comes back
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') setTimeout(checkTimers, 500);
+});
+
 // Wake lock to prevent phone from sleeping while page is open
 if ('wakeLock' in navigator) {
   try {
