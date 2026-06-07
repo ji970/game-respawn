@@ -1405,12 +1405,17 @@ function initApp() {
 let pushSubscription = null;
 
 async function subscribePush(reg) {
-  if (!('PushManager' in window)) return;
+  if (!('PushManager' in window)) {
+    console.log('PushManager not available');
+    return;
+  }
   try {
-    // Must have notification permission first
     if (Notification.permission !== 'granted') {
       const p = await Notification.requestPermission();
-      if (p !== 'granted') return;
+      if (p !== 'granted') {
+        toast('通知权限未开启，后台推送不可用');
+        return;
+      }
     }
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
@@ -1421,8 +1426,11 @@ async function subscribePush(reg) {
     }
     pushSubscription = sub;
     document.getElementById('permBanner').classList.remove('show');
+    console.log('Push subscribed:', sub.endpoint.substring(0,50));
   } catch(e) {
+    console.error('Push subscribe failed:', e.message);
     document.getElementById('permBanner').classList.add('show');
+    toast('推送订阅失败，后台通知不可用');
   }
 }
 
