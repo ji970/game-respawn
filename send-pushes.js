@@ -60,4 +60,10 @@ async function main() {
   }
 }
 
-main();
+async function loop() {
+  for (let i = 0; i < 5; i++) {
+    await main();
+    if (i < 4) await new Promise(r => setTimeout(r, 60000));
+  }
+}
+loop();
