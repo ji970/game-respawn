@@ -1,4 +1,4 @@
-name: Push Scheduler
+name: Push Cron
 
 on:
   schedule:
