@@ -1,25 +1,38 @@
 const webpush = require('web-push');
+const https = require('https');
 
 webpush.setVapidDetails(
   'https://ji970.github.io/game-respawn/',
-  'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw',
-  'EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI'
+  process.env.VAPID_PUBLIC,
+  process.env.VAPID_PRIVATE
 );
 
-const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+
+function fetch(url, opts) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve({ json: () => JSON.parse(data), status: res.statusCode }));
+    });
+    req.on('error', reject);
+    if (opts.body) req.write(opts.body);
+    req.end();
+  });
+}
 
 async function main() {
   try {
     const res = await fetch(SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&limit=50', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
-    let pushes = await res.json();
-    if (!Array.isArray(pushes) || pushes.length === 0) { console.log(new Date().toISOString() + ' - none'); return; }
+    const pushes = await res.json();
+    if (!Array.isArray(pushes) || pushes.length === 0) return;
 
     const now = Date.now();
     const due = pushes.filter(p => new Date(p.notify_at).getTime() <= now);
-    console.log(new Date().toISOString() + ' - pending: ' + pushes.length + ', due: ' + due.length);
 
     for (const p of due) {
       try {
@@ -32,9 +45,7 @@ async function main() {
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
           body: JSON.stringify({ sent: true })
         });
-        console.log('Sent: ' + p.title);
       } catch(e) {
-        console.error('Fail: ' + p.title + ' - ' + e.message);
         if (e.statusCode === 410 || e.statusCode === 404) {
           await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
             method: 'PATCH',
@@ -45,8 +56,8 @@ async function main() {
       }
     }
   } catch(e) {
-    console.error('Error: ' + e.message);
+    console.error(e.message);
   }
 }
 
-main().catch(e => { console.error(e.message); process.exit(1); });
+main();
