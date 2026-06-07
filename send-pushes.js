@@ -3,12 +3,12 @@ const https = require('https');
 
 webpush.setVapidDetails(
   'https://ji970.github.io/game-respawn/',
-  process.env.VAPID_PUBLIC,
-  process.env.VAPID_PRIVATE
+  'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw',
+  'EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI'
 );
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 
 function fetch(url, opts) {
   return new Promise((resolve, reject) => {
