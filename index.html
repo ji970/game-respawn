@@ -984,19 +984,20 @@ function onCardClick(resId) {
   }
 
   // Start timer - allow custom time
-  const defaultMin = r.min;
   const label = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min);
-  const input = prompt(r.name + ' 默认刷新时间：' + label + '\n输入自定义分钟数（留空使用默认）：', '');
-  if (input === null) return; // user cancelled
-  if (input.trim() === '') {
-    startTimer(r);
-  } else {
-    const customMin = parseInt(input);
-    if (isNaN(customMin) || customMin <= 0) {
-      toast('请输入有效的分钟数');
-      return;
+  try {
+    const input = prompt(r.name + ' 默认刷新时间：' + label + '\n输入自定义分钟数（留空使用默认）：', '');
+    if (input === null) return;
+    if (input.trim() === '') {
+      startTimer(r);
+    } else {
+      const customMin = parseInt(input);
+      if (isNaN(customMin) || customMin <= 0) { toast('请输入有效的分钟数'); return; }
+      startTimer(r, customMin);
     }
-    startTimer(r, customMin);
+  } catch(e) {
+    // prompt blocked by browser - use default time
+    startTimer(r);
   }
 }
 
