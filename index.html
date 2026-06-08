@@ -800,14 +800,39 @@ function renderCards() {
   const main = document.getElementById('main');
   const timers = loadTimers();
   let items;
+  let cloneItems = [];
   if (currentCat === 'active') {
-    // Show resources with active or completed timers
-    items = resources.filter(r => !!timers[r.id]);
+    // Show resources with active or completed timers + their clones
+    items = resources.filter(r => {
+      const s = timers[r.id];
+      if (!s) return false;
+      // Check main timer
+      if (s.startTime || s.daily) return true;
+      // Check clones
+      if (s.clones) {
+        for (const c of Object.values(s.clones)) {
+          if (c && (c.minNotified === false || c.maxNotified === false)) return true;
+        }
+      }
+      return false;
+    });
+    // Build clone entries for active view
+    items.forEach(r => {
+      const s = timers[r.id];
+      if (s && s.clones) {
+        [1,2,3,4,5].forEach(slot => {
+          const c = s.clones[slot];
+          if (c && (c.minNotified === false || c.maxNotified === false)) {
+            cloneItems.push({ rid: r.id, slot: slot, clone: c });
+          }
+        });
+      }
+    });
   } else {
     items = resources.filter(r => r.cat === currentCat);
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && cloneItems.length === 0) {
     main.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
       <div style="font-size:48px;margin-bottom:12px">⏱️</div>
       <div>${currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资'}</div>
@@ -911,8 +936,35 @@ function renderCards() {
       </div>`;
   }).join('')}</div>`;
 
+  // Add clone cards in active view
+  if (currentCat === 'active' && cloneItems.length > 0) {
+    main.innerHTML += '<div style="font-size:12px;color:var(--text2);padding:12px 4px 4px">分身计时</div><div class="grid">' +
+    cloneItems.map(ci => {
+      const r = resources.find(x => x.id === ci.rid);
+      const c = ci.clone;
+      const elapsed = (Date.now() - c.startTime) / 1000 * (testMode ? 60 : 1);
+      let nextSec = Math.max(0, c.max * 60 - 2 * 60 - elapsed);
+      if (nextSec <= 0) nextSec = 0;
+      const cdText = nextSec <= 0 ? '已刷新' : '⏳ ' + formatCountdown(Math.ceil(nextSec));
+      return '<div class="card running" style="cursor:pointer" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
+        '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
+        '<div class="countdown">' + cdText + '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  // Clone card click handler
+  main.querySelectorAll('.card[data-cid]').forEach(card => {
+    card.addEventListener('click', () => {
+      const rid = parseInt(card.dataset.cid);
+      const slot = parseInt(card.dataset.slot);
+      cancelTimer(rid, slot);
+      toast(resources.find(x => x.id === rid)?.name + ' 分身' + slot + ' 已停止');
+    });
+  });
+
   // Bind events
-  main.querySelectorAll('.card').forEach(card => {
+  main.querySelectorAll('.card:not([data-cid])').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.classList.contains('cancel-btn')) return;
       if (e.target.closest('.island-wrap')) return;
