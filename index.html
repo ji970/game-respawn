@@ -850,7 +850,12 @@ function renderCards() {
         countdownHtml = '已刷新';
         countdownCls = 'expired-text';
       } else {
-        countdownHtml = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        const cdText = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
+          countdownHtml = '已刷新 ' + cdText + '后结束';
+        } else {
+          countdownHtml = cdText;
+        }
       }
       }
     } else if (isExpired) {
@@ -1337,7 +1342,12 @@ function refreshCountdowns() {
         cdEl.textContent = '已刷新';
         cdEl.className = 'countdown expired-text';
       } else {
-        cdEl.textContent = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
+          cdEl.textContent = '已刷新 ' + t2 + '后结束';
+        } else {
+          cdEl.textContent = t2;
+        }
         cdEl.className = 'countdown';
       }
     }
