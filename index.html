@@ -847,7 +847,12 @@ function renderCards() {
       }
       if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
       if (nextCheckSec <= 0) {
-        countdownHtml = '已刷新';
+        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
+          const remain = state.max - state.min;
+          countdownHtml = '已刷新 至' + formatTime(remain) + '后结束';
+        } else {
+          countdownHtml = '已刷新';
+        }
         countdownCls = 'expired-text';
       } else {
         countdownHtml = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
@@ -1330,7 +1335,11 @@ function refreshCountdowns() {
     const cdEl = card.querySelector('.countdown');
     if (cdEl) {
       if (nextCheckSec <= 0) {
-        cdEl.textContent = '已刷新';
+        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
+          cdEl.textContent = '已刷新 至' + formatTime((state.max||r.max) - (state.min||r.min)) + '后结束';
+        } else {
+          cdEl.textContent = '已刷新';
+        }
         cdEl.className = 'countdown expired-text';
       } else {
         cdEl.textContent = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
