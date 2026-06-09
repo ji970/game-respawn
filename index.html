@@ -948,10 +948,27 @@ function renderCards() {
     cloneItems.map(ci => {
       const r = resources.find(x => x.id === ci.rid);
       const c = ci.clone;
-      const elapsed = (Date.now() - c.startTime) / 1000 * (testMode ? 60 : 1);
-      let nextSec = Math.max(0, c.max * 60 - 2 * 60 - elapsed);
+      const mult = testMode ? 60 : 1;
+      const elapsed = (Date.now() - c.startTime) / 1000 * mult;
+      const adv = 2;
+      // For variable resources, show min->max countdown
+      let nextSec = Math.max(0, c.max * 60 - adv * 60 - elapsed);
+      if (c.variable && c.minNotified === false) {
+        const minSec = Math.max(0, c.min * 60 - adv * 60 - elapsed);
+        if (minSec > 0 && minSec < nextSec) nextSec = minSec;
+      }
       if (nextSec <= 0) nextSec = 0;
-      const cdText = nextSec <= 0 ? '已刷新' : '⏳ ' + formatCountdown(Math.ceil(nextSec));
+      let cdText;
+      if (nextSec <= 0) {
+        cdText = '已刷新';
+      } else {
+        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
+        if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
+          cdText = '已刷新 ' + t2 + '后结束';
+        } else {
+          cdText = t2;
+        }
+      }
       const ciIsland = ci.clone.island || 1;
       return '<div class="card running" style="cursor:pointer" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
         '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
