@@ -952,9 +952,11 @@ function renderCards() {
       let nextSec = Math.max(0, c.max * 60 - 2 * 60 - elapsed);
       if (nextSec <= 0) nextSec = 0;
       const cdText = nextSec <= 0 ? '已刷新' : '⏳ ' + formatCountdown(Math.ceil(nextSec));
+      const ciIsland = ci.clone.island || 1;
       return '<div class="card running" style="cursor:pointer" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
         '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
         '<div class="countdown">' + cdText + '</div>' +
+        '<div class="time-label">岛屿 ' + ciIsland + '</div>' +
         '</div>';
     }).join('') + '</div>';
   }
