@@ -15,10 +15,12 @@ async function main() {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
     const pushes = await r.json();
+    console.log('Found ' + (Array.isArray(pushes)?pushes.length:'error') + ' pending');
     if (!Array.isArray(pushes) || pushes.length === 0) return;
 
     const now = Date.now();
     const due = pushes.filter(p => new Date(p.notify_at).getTime() <= now);
+    console.log('Due: ' + due.length);
 
     for (const p of due) {
       try {
@@ -42,7 +44,8 @@ async function main() {
       }
     }
   } catch(e) {
-    console.error(e.message);
+    console.error('FATAL: ' + e.message);
+    throw e;
   }
 }
 
