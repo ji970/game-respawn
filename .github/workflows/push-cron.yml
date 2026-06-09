@@ -12,12 +12,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install web-push
       - name: Send pushes
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
-          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-        run: node send-pushes.js
+        run: node -e "
+          const w=require('web-push');
+          w.setVapidDetails('https://ji970.github.io/game-respawn/','BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw','EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI');
+          const SU='https://gwjqhrqmfamjrdhllrqk.supabase.co';
+          const SK='sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
+          (async()=>{
+            const r=await fetch(SU+'/rest/v1/push_queue?sent=eq.false&limit=50',{headers:{apikey:SK,Authorization:'Bearer '+SK}});
+            let p=await r.json();if(!Array.isArray(p))return;
+            const now=Date.now();const due=p.filter(x=>new Date(x.notify_at).getTime()<=now);
+            for(const x of due){
+              try{
+                await w.sendNotification({endpoint:x.endpoint,keys:{p256dh:x.p256dh,auth:x.auth}},JSON.stringify({title:x.title,body:x.body}));
+                await fetch(SU+'/rest/v1/push_queue?id=eq.'+x.id,{method:'PATCH',headers:{apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'},body:JSON.stringify({sent:true})});
+              }catch(e){if(e.statusCode===410||e.statusCode===404)await fetch(SU+'/rest/v1/push_queue?id=eq.'+x.id,{method:'PATCH',headers:{apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'},body:JSON.stringify({sent:true})})}
+            }
+          })();
+        "
