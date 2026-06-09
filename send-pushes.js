@@ -1,5 +1,4 @@
 const webpush = require('web-push');
-const https = require('https');
 
 webpush.setVapidDetails(
   'https://ji970.github.io/game-respawn/',
@@ -10,25 +9,12 @@ webpush.setVapidDetails(
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 
-function fetch(url, opts) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, opts, res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => resolve({ json: () => JSON.parse(data), status: res.statusCode }));
-    });
-    req.on('error', reject);
-    if (opts.body) req.write(opts.body);
-    req.end();
-  });
-}
-
 async function main() {
   try {
-    const res = await fetch(SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&limit=50', {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&limit=50', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
-    const pushes = await res.json();
+    const pushes = await r.json();
     if (!Array.isArray(pushes) || pushes.length === 0) return;
 
     const now = Date.now();
@@ -60,10 +46,4 @@ async function main() {
   }
 }
 
-async function loop() {
-  for (let i = 0; i < 5; i++) {
-    await main();
-    if (i < 4) await new Promise(r => setTimeout(r, 60000));
-  }
-}
-loop();
+main();
