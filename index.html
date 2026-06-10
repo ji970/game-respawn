@@ -551,8 +551,8 @@ async function activate() {
       const existing = await checkRes.json();
 
       if (existing.length > 0 && existing[0].device !== device) {
-        // Allow up to 2 devices (QQ/WeChat → browser transition)
-        if (existing.length >= 2) {
+        // One code, one device
+        if (existing.length >= 1) {
           errEl.textContent = '此激活码已在其他设备使用';
           btn.disabled = false; btn.textContent = '激活';
           return;
