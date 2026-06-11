@@ -1072,7 +1072,13 @@ function onCardClick(resId) {
     return;
   }
   if (state && (state.minNotified === false || state.maxNotified === false)) {
-    cancelTimer(resId);
+    const elapsed = Math.floor((Date.now() - state.startTime) / 1000 / 60);
+    const island = state.island || 1;
+    if (r.v && state.minNotified === false) {
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后结束');
+    } else {
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，剩余' + formatTime(Math.max(0, r.max - elapsed)));
+    }
     return;
   }
 
