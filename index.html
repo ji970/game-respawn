@@ -978,7 +978,6 @@ function renderCards() {
         ${dailyBadge}
         <div class="countdown ${countdownCls}">${countdownHtml}</div>
         ${islandHtml}
-        ${getResourceNoteHtml(r.id)}
         <button class="clone-btn" data-rid="${r.id}">+</button>
         <div class="clone-popup" data-rid="${r.id}">
           ${[1,2,3,4,5,6,7,8,9,10].map(n => {
@@ -995,7 +994,7 @@ function renderCards() {
             return '<div class="clone-dot'+(active?' active':'')+'"></div>';
           }).join('')}
         </div>
-      </div>`;
+      </div>` + getResourceNoteHtml(r.id);
   }).join('')}</div>`;
 
   // Add clone cards in active view
