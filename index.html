@@ -298,10 +298,9 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   white-space: nowrap; text-overflow: ellipsis; text-align: center;
 }
 .note-btn {
-  width: 16px; height: 16px; font-size: 10px; line-height: 14px;
-  color: #66bb6a; cursor: pointer; margin: 2px auto 0;
-  border: 1px solid #2a2a45; border-radius: 50%;
-  background: transparent; padding: 0; display: block;
+  font-size: 9px; color: #66bb6a; cursor: pointer; margin-top: 2px;
+  padding: 1px 5px; border: 1px solid #2a2a45; border-radius: 6px;
+  background: transparent; display: inline-block;
 }
 .note-btn:active { background: #2a2a45; }
 
@@ -817,17 +816,17 @@ function getResourceNoteHtml(rid) {
   const notes = loadNotes();
   const note = notes[rid];
   if (note) {
-    return '<div class="card-note" data-note-rid="'+rid+'">'+'📝'+escHtml(note)+'</div>';
+    return '<div class="card-note" data-note-rid="'+rid+'">'+'备注+'+escHtml(note)+'</div>';
   }
-  return '<div class="note-btn" data-note-rid="'+rid+'">📝</div>';
+  return '<div class="note-btn" data-note-rid="'+rid+'">备注+</div>';
 }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function cloneNoteHtml(rid, slot) {
   const notes = loadNotes();
   const key = rid + '_c' + slot;
   const note = notes[key];
-  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+'📝'+escHtml(note)+'</div>';
-  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">📝</div>';
+  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+'备注+'+escHtml(note)+'</div>';
+  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">备注+</div>';
 }
 function editNote(rid, slot) {
   const notes = loadNotes();
