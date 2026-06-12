@@ -1051,7 +1051,11 @@ function renderCards() {
   main.querySelectorAll('.card[data-cid]').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.cancel-btn')) return;
-      if (e.target.closest('.card-note, .note-btn')) return;
+      const noteEl = e.target.closest('.card-note, .note-btn');
+      if (noteEl) {
+        editNote(parseInt(noteEl.dataset.noteRid), parseInt(noteEl.dataset.noteSlot));
+        return;
+      }
       const c = (loadTimers()[parseInt(card.dataset.cid)]?.clones || {})[parseInt(card.dataset.slot)];
       if (c) {
         const elapsed = Math.floor((Date.now() - c.startTime) / 60000);
