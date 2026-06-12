@@ -1026,7 +1026,8 @@ function renderCards() {
         }
       }
       const ciIsland = ci.clone.island || 1;
-      return '<div class="card running" style="cursor:pointer" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
+      return '<div class="card running" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
+        '<button class="cancel-btn" style="display:block" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">&times;</button>' +
         '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
         '<div class="countdown">' + cdText + '</div>' +
         '<div class="time-label">岛屿 ' + ciIsland + '</div>' +
@@ -1036,12 +1037,26 @@ function renderCards() {
   }
 
   // Clone card click handler
-  main.querySelectorAll('.card[data-cid]').forEach(card => {
-    card.addEventListener('click', () => {
-      const rid = parseInt(card.dataset.cid);
-      const slot = parseInt(card.dataset.slot);
+  // Clone ❌ button handler
+  main.querySelectorAll('.cancel-btn[data-cid]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(btn.dataset.cid);
+      const slot = parseInt(btn.dataset.slot);
       cancelTimer(rid, slot);
       toast(resources.find(x => x.id === rid)?.name + ' 分身' + slot + ' 已停止');
+    });
+  });
+  // Clone card click - show info
+  main.querySelectorAll('.card[data-cid]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.cancel-btn')) return;
+      if (e.target.closest('.card-note, .note-btn')) return;
+      const c = (loadTimers()[parseInt(card.dataset.cid)]?.clones || {})[parseInt(card.dataset.slot)];
+      if (c) {
+        const elapsed = Math.floor((Date.now() - c.startTime) / 60000);
+        toast((resources.find(x=>x.id===parseInt(card.dataset.cid))?.name||'')+' 分身'+card.dataset.slot+' 已过'+formatTime(elapsed)+' 剩余'+formatTime(Math.max(0,c.max-elapsed)));
+      }
     });
   });
 
