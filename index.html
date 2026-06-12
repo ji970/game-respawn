@@ -1118,25 +1118,29 @@ function renderCards() {
       if (!wasOpen) popup.classList.add('open');
     });
   });
-  main.querySelectorAll('.island-popup button').forEach(b => {
+  main.querySelectorAll('.island-popup button:not([data-cid])').forEach(b => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (b.dataset.cid) {
-        // Clone island popup
-        const rid = parseInt(b.dataset.cid);
-        const slot = parseInt(b.dataset.slot);
-        const idx = parseInt(b.dataset.idx);
-        const timers = loadTimers();
-        if (timers[rid]?.clones?.[slot]) {
-          timers[rid].clones[slot].island = idx;
-          saveTimers(timers);
-        }
-      } else {
-        const rid = parseInt(b.dataset.rid);
-        const idx = parseInt(b.dataset.idx);
-        selectIsland(rid, idx);
+      const rid = parseInt(b.dataset.rid);
+      const idx = parseInt(b.dataset.idx);
+      selectIsland(rid, idx);
+      closeAllPopups();
+    });
+  });
+  // Clone island popup buttons
+  main.querySelectorAll('.island-popup button[data-cid]').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(b.dataset.cid);
+      const slot = parseInt(b.dataset.slot);
+      const idx = parseInt(b.dataset.idx);
+      const timers = loadTimers();
+      if (timers[rid]?.clones?.[slot]) {
+        timers[rid].clones[slot].island = idx;
+        saveTimers(timers);
       }
       closeAllPopups();
+      renderCards();
     });
   });
   // Close popups when tapping outside
