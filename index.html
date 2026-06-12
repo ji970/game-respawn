@@ -1121,9 +1121,21 @@ function renderCards() {
   main.querySelectorAll('.island-popup button').forEach(b => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
-      const rid = parseInt(b.dataset.rid);
-      const idx = parseInt(b.dataset.idx);
-      selectIsland(rid, idx);
+      if (b.dataset.cid) {
+        // Clone island popup
+        const rid = parseInt(b.dataset.cid);
+        const slot = parseInt(b.dataset.slot);
+        const idx = parseInt(b.dataset.idx);
+        const timers = loadTimers();
+        if (timers[rid]?.clones?.[slot]) {
+          timers[rid].clones[slot].island = idx;
+          saveTimers(timers);
+        }
+      } else {
+        const rid = parseInt(b.dataset.rid);
+        const idx = parseInt(b.dataset.idx);
+        selectIsland(rid, idx);
+      }
       closeAllPopups();
     });
   });
