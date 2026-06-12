@@ -977,6 +977,7 @@ function renderCards() {
         <div class="name">${r.name}</div>
         <div class="time-label">${timeLabel}</div>
         ${dailyBadge}
+        ${getResourceNoteHtml(r.id)}
         <div class="countdown ${countdownCls}">${countdownHtml}</div>
         ${islandHtml}
         <button class="clone-btn" data-rid="${r.id}">+</button>
@@ -995,7 +996,7 @@ function renderCards() {
             return '<div class="clone-dot'+(active?' active':'')+'"></div>';
           }).join('')}
         </div>
-      </div>` + getResourceNoteHtml(r.id);
+      </div>`;
   }).join('')}</div>`;
 
   // Add clone cards in active view
