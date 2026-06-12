@@ -1050,9 +1050,10 @@ function renderCards() {
     card.addEventListener('click', (e) => {
       if (e.target.classList.contains('cancel-btn')) return;
       if (e.target.closest('.island-wrap')) return;
-      if (e.target.classList.contains('card-note') || e.target.classList.contains('note-btn')) {
-        const slot = e.target.dataset.noteSlot ? parseInt(e.target.dataset.noteSlot) : undefined;
-        editNote(parseInt(e.target.dataset.noteRid), slot);
+      const noteEl = e.target.closest('.card-note, .note-btn');
+      if (noteEl) {
+        const slot = noteEl.dataset.noteSlot ? parseInt(noteEl.dataset.noteSlot) : undefined;
+        editNote(parseInt(noteEl.dataset.noteRid), slot);
         return;
       }
       onCardClick(parseInt(card.dataset.id));
