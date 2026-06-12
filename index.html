@@ -1578,6 +1578,38 @@ function refreshCountdowns() {
       });
     }
   });
+
+  // Update clone card countdowns
+  document.querySelectorAll('.card[data-cid]').forEach(card => {
+    const rid = parseInt(card.dataset.cid);
+    const slot = parseInt(card.dataset.slot);
+    const state = timers[rid];
+    if (!state || !state.clones || !state.clones[slot]) return;
+    const c = state.clones[slot];
+    if (!c.startTime) return;
+    const elapsed = (Date.now() - c.startTime) / 1000 * mult;
+    const ADV = 2;
+    let nextSec = Math.max(0, c.max * 60 - ADV * 60 - elapsed);
+    if (c.variable && c.minNotified === false) {
+      const minSec = Math.max(0, c.min * 60 - ADV * 60 - elapsed);
+      if (minSec > 0 && minSec < nextSec) nextSec = minSec;
+    }
+    const cdEl = card.querySelector('.countdown');
+    if (cdEl) {
+      if (nextSec <= 0) {
+        cdEl.textContent = '✅ 已刷新';
+        cdEl.className = 'countdown expired-text';
+      } else {
+        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
+        if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
+          cdEl.textContent = '已刷新 ' + t2 + '后结束';
+        } else {
+          cdEl.textContent = t2;
+        }
+        cdEl.className = 'countdown';
+      }
+    }
+  });
 }
 
 // ====== 初始化 ======
