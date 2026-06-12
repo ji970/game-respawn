@@ -821,15 +821,23 @@ function getResourceNoteHtml(rid) {
   return '<div class="note-btn" data-note-rid="'+rid+'">+ 备注</div>';
 }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function editNote(rid) {
+function cloneNoteHtml(rid, slot) {
   const notes = loadNotes();
-  const old = notes[rid] || '';
+  const key = rid + '_c' + slot;
+  const note = notes[key];
+  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+escHtml(note)+'</div>';
+  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">+ 备注</div>';
+}
+function editNote(rid, slot) {
+  const notes = loadNotes();
+  const key = slot ? rid + '_c' + slot : rid;
+  const old = notes[key] || '';
   const input = prompt('备注位置信息：', old);
   if (input === null) return;
   if (input.trim() === '') {
-    delete notes[rid];
+    delete notes[key];
   } else {
-    notes[rid] = input.trim();
+    notes[key] = input.trim();
   }
   localStorage.setItem('resource_notes', JSON.stringify(notes));
   renderCards();
@@ -1022,6 +1030,7 @@ function renderCards() {
         '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
         '<div class="countdown">' + cdText + '</div>' +
         '<div class="time-label">岛屿 ' + ciIsland + '</div>' +
+        (cloneNoteHtml(ci.rid, ci.slot)) +
         '</div>';
     }).join('') + '</div>';
   }
@@ -1041,6 +1050,11 @@ function renderCards() {
     card.addEventListener('click', (e) => {
       if (e.target.classList.contains('cancel-btn')) return;
       if (e.target.closest('.island-wrap')) return;
+      if (e.target.classList.contains('card-note') || e.target.classList.contains('note-btn')) {
+        const slot = e.target.dataset.noteSlot ? parseInt(e.target.dataset.noteSlot) : undefined;
+        editNote(parseInt(e.target.dataset.noteRid), slot);
+        return;
+      }
       onCardClick(parseInt(card.dataset.id));
     });
   });
