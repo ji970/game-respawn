@@ -816,17 +816,17 @@ function getResourceNoteHtml(rid) {
   const notes = loadNotes();
   const note = notes[rid];
   if (note) {
-    return '<div class="card-note" data-note-rid="'+rid+'">'+'备注+'+escHtml(note)+'</div>';
+    return '<div class="card-note" data-note-rid="'+rid+'">'+escHtml(note)+'</div>';
   }
-  return '<div class="note-btn" data-note-rid="'+rid+'">备注+</div>';
+  return '<div class="note-btn" data-note-rid="'+rid+'">+ 备注</div>';
 }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function cloneNoteHtml(rid, slot) {
   const notes = loadNotes();
   const key = rid + '_c' + slot;
   const note = notes[key];
-  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+'备注+'+escHtml(note)+'</div>';
-  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">备注+</div>';
+  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+escHtml(note)+'</div>';
+  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">+ 备注</div>';
 }
 function editNote(rid, slot) {
   const notes = loadNotes();
