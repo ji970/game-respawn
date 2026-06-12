@@ -884,7 +884,7 @@ function renderCards() {
       if (s && s.clones) {
         [1,2,3,4,5,6,7,8,9,10].forEach(slot => {
           const c = s.clones[slot];
-          if (c && (c.minNotified === false || c.maxNotified === false)) {
+          if (c) {
             cloneItems.push({ rid: r.id, slot: slot, clone: c });
           }
         });
@@ -1017,7 +1017,7 @@ function renderCards() {
       if (nextSec <= 0) nextSec = 0;
       let cdText;
       if (nextSec <= 0) {
-        cdText = '已刷新';
+        cdText = '✅ 已刷新';
       } else {
         const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
         if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
