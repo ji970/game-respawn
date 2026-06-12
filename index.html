@@ -1031,7 +1031,8 @@ function renderCards() {
         '<button class="cancel-btn" style="display:block" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">&times;</button>' +
         '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
         '<div class="countdown">' + cdText + '</div>' +
-        '<div class="time-label">岛屿 ' + ciIsland + '</div>' +
+        '<div class="island-wrap"><button class="island-btn clone-island-btn" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">岛屿 ' + ciIsland + '</button>' +
+        '<div class="island-popup">' + Array.from({length:10},(_,i)=>'<button data-idx="'+(i+1)+'" data-cid="'+ci.rid+'" data-slot="'+ci.slot+'"'+(ciIsland===i+1?' class=\"sel\"':'')+'>'+(i+1)+'</button>').join('')+'</div></div>' +
         (cloneNoteHtml(ci.rid, ci.slot)) +
         '</div>';
     }).join('') + '</div>';
@@ -1055,6 +1056,28 @@ function renderCards() {
       const noteEl = e.target.closest('.card-note, .note-btn');
       if (noteEl) {
         editNote(parseInt(noteEl.dataset.noteRid), parseInt(noteEl.dataset.noteSlot));
+        return;
+      }
+      // Clone island popup toggle
+      const ciBtn = e.target.closest('.clone-island-btn');
+      if (ciBtn) {
+        const popup = ciBtn.parentElement.querySelector('.island-popup');
+        const wasOpen = popup.classList.contains('open');
+        closeAllPopups();
+        if (!wasOpen) popup.classList.add('open');
+        return;
+      }
+      // Clone island selection
+      const ciPopupBtn = e.target.closest('.island-popup button');
+      if (ciPopupBtn && ciPopupBtn.dataset.cid) {
+        const idx = parseInt(ciPopupBtn.dataset.idx);
+        const timers = loadTimers();
+        if (timers[ciPopupBtn.dataset.cid]?.clones?.[ciPopupBtn.dataset.slot]) {
+          timers[ciPopupBtn.dataset.cid].clones[ciPopupBtn.dataset.slot].island = idx;
+          saveTimers(timers);
+        }
+        closeAllPopups();
+        renderCards();
         return;
       }
       const c = (loadTimers()[parseInt(card.dataset.cid)]?.clones || {})[parseInt(card.dataset.slot)];
