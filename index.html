@@ -704,7 +704,8 @@ const resources = [
   { id:86, name:'星梦之匣', cat:'chest', min:240, max:240, icon:'', note:'4h' },
   { id:87, name:'水晶矿', cat:'chest', min:30, max:30, icon:'', note:'30min' },
   { id:88, name:'日冕草', cat:'plant', min:120, max:240, icon:'', v:true, note:'2~4h' },
-  { id:89, name:'美人鱼鳞片', cat:'plant', min:660, max:780, icon:'', v:true, note:'11~13h' }
+  { id:89, name:'美人鱼鳞片', cat:'plant', min:660, max:780, icon:'', v:true, note:'11~13h' },
+  { id:90, name:'钻头', cat:'elite', min:0, max:0, icon:'', note:'无固定时间，手动输入' }
 ];
 
 const categories = [
@@ -1201,10 +1202,14 @@ function onCardClick(resId) {
   }
 
   // Start timer - allow custom time
-  const label = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min);
+  const label = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '无固定时间';
   try {
-    const input = prompt(r.name + ' 默认刷新时间：' + label + '\n输入自定义分钟数（留空使用默认）：', '');
+    const input = prompt(r.name + ' 默认刷新时间：' + label + (r.min === 0 ? '\n此物资无默认时间，请输入分钟数：' : '\n输入自定义分钟数（留空使用默认）：'), r.min === 0 ? '' : '');
     if (input === null) return;
+    if (r.min === 0 && input.trim() === '') {
+      toast('请输入有效分钟数');
+      return;
+    }
     if (input.trim() === '') {
       startTimer(r);
     } else {
