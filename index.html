@@ -705,7 +705,7 @@ const resources = [
   { id:87, name:'水晶矿', cat:'chest', min:30, max:30, icon:'', note:'30min' },
   { id:88, name:'日冕草', cat:'plant', min:120, max:240, icon:'', v:true, note:'2~4h' },
   { id:89, name:'美人鱼鳞片', cat:'plant', min:660, max:780, icon:'', v:true, note:'11~13h' },
-  { id:90, name:'钻头', cat:'elite', min:0, max:0, icon:'', note:'无固定时间，手动输入' }
+  { id:90, name:'钻头', cat:'elite', min:0, max:0, icon:'', note:'剩余时间+10min提醒【波动2min】' }
 ];
 
 const categories = [
@@ -956,7 +956,7 @@ function renderCards() {
       countdownCls = 'expired-text';
     }
 
-    const timeLabel = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min);
+    const timeLabel = r.min === 0 ? '自定义' : (r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min));
     const noteAttr = r.note ? ` title="${r.note}"` : '';
 
     const island = (state && state.island) || (islandSelections[r.id]) || 1;
