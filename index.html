@@ -957,7 +957,8 @@ function renderCards() {
     }
 
     const timeLabel = r.min === 0 ? '自定义' : (r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min));
-    const noteAttr = r.note ? ` title="${r.note}"` : '';
+    const timeHint = r.min === 0 && r.note ? '<div style="font-size:8px;color:var(--text2);margin-top:1px">'+r.note+'</div>' : '';
+    const noteAttr = r.note && r.min !== 0 ? ` title="${r.note}"` : '';
 
     const island = (state && state.island) || (islandSelections[r.id]) || 1;
     const islandHtml = '<div class="island-wrap">' +
@@ -978,6 +979,7 @@ function renderCards() {
         </div>
         <div class="name">${r.name}</div>
         <div class="time-label">${timeLabel}</div>
+        ${timeHint}
         ${dailyBadge}
         ${getResourceNoteHtml(r.id)}
         <div class="countdown ${countdownCls}">${countdownHtml}</div>
