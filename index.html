@@ -469,12 +469,13 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
-  let id = localStorage.getItem('_did');
-  if (!id) {
-    id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    localStorage.setItem('_did', id);
-  }
-  return id;
+  // Hardware-based fingerprint - same across links on same device
+  const parts = [
+    screen.width + 'x' + screen.height,
+    navigator.hardwareConcurrency || 0,
+    (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac/i) || [''])[0],
+  ];
+  return parts.join('|');
 }
 
 async function hmacHex(message, secret) {
@@ -564,8 +565,8 @@ async function activate() {
       const existing = await checkRes.json();
 
       if (existing.length > 0 && existing[0].device !== device) {
-        // Allow up to 2 devices (different links on same phone = different localStorage)
-        if (existing.length >= 2) {
+        // One code, one device
+        if (existing.length >= 1) {
           errEl.textContent = '此激活码已在其他设备使用';
           btn.disabled = false; btn.textContent = '激活';
           return;
