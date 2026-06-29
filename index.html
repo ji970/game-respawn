@@ -1290,13 +1290,25 @@ function startClone(rid, slot) {
     return;
   }
 
+  // Allow custom time for clones
+  let effMin = r.min, effMax = r.max, isVar = r.v || false;
+  const label = isVar ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '自定义';
+  try {
+    const input = prompt(r.name + ' 分身' + slot + ' 时间：' + label + '\n输入自定义分钟数（留空默认）：', '');
+    if (input === null) return;
+    if (input.trim() !== '') {
+      const cm = parseInt(input);
+      if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); return; }
+      effMin = cm; effMax = cm; isVar = false;
+    }
+  } catch(e) {}
   const island = islandSelections[rid] || 1;
   const timerKey = rid + '_' + slot + '_' + Date.now();
   timers[rid].clones[slot] = {
     startTime: Date.now(),
-    min: r.min, max: r.max,
+    min: effMin, max: effMax,
     minNotified: false, maxNotified: false,
-    variable: r.v || false,
+    variable: isVar,
     island: island,
     timerKey: timerKey,
   };
