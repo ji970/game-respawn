@@ -315,6 +315,8 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 }
 
 
+
+.fav-star { position:absolute; top:2px; left:2px; width:18px; height:18px; border:none; background:transparent; font-size:12px; cursor:pointer; padding:0; line-height:18px; opacity:0.4; } .fav-star.on { opacity:1; }
 /* Clone button */
 .clone-btn {
   position: absolute;
@@ -710,6 +712,7 @@ const resources = [
   ];
 
 const categories = [
+  { key:'fav', label:'⭐ 常用' },
   { key:'active', label:'⏱ 活跃计时' },
   { key:'crop',    label:'🌾 农作物' },
   { key:'plant',   label:'🌿 稀有植物' },
@@ -847,6 +850,9 @@ function editNote(rid, slot) {
   renderCards();
 }
 
+
+function loadFavs(){try{return JSON.parse(localStorage.getItem("favs"))||[]}catch(e){return[]}}
+function toggleFav(rid){let f=loadFavs();const i=f.indexOf(rid);if(i<0)f.push(rid);else f.splice(i,1);localStorage.setItem("favs",JSON.stringify(f));renderCards();}
 function renderNav() {
   const nav = document.getElementById('nav');
   nav.innerHTML = categories.map(c =>
@@ -866,7 +872,9 @@ function renderCards() {
   const timers = loadTimers();
   let items;
   let cloneItems = [];
-  if (currentCat === 'active') {
+  if (currentCat === 'fav') {
+    items = resources.filter(r => loadFavs().includes(r.id));
+  } else if (currentCat === 'active') {
     // Show resources with active or completed timers + their clones
     items = resources.filter(r => {
       const s = timers[r.id];
@@ -900,7 +908,7 @@ function renderCards() {
   if (items.length === 0 && cloneItems.length === 0) {
     main.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
       <div style="font-size:48px;margin-bottom:12px">⏱️</div>
-      <div>${currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资'}</div>
+      <div>${currentCat === 'fav' ? '暂无常用物资，点击⭐添加' : (currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资')}</div>
     </div>`;
     return;
   }
@@ -985,7 +993,7 @@ function renderCards() {
         ${getResourceNoteHtml(r.id)}
         <div class="countdown ${countdownCls}">${countdownHtml}</div>
         ${islandHtml}
-        <button class="clone-btn" data-rid="${r.id}">+</button>
+        <button class="fav-star ${loadFavs().includes(r.id)?"on":""}" data-fav="${r.id}">⭐</button><button class="clone-btn" data-rid="${r.id}">+</button>
         <div class="clone-popup" data-rid="${r.id}">
           ${[1,2,3,4,5,6,7,8,9,10].map(n => {
             const clone = state && state.clones && state.clones[n];
@@ -1098,6 +1106,7 @@ function renderCards() {
     card.addEventListener('click', (e) => {
       if (e.target.classList.contains('cancel-btn')) return;
       if (e.target.closest('.island-wrap')) return;
+      if (e.target.classList.contains('fav-star')) { e.stopPropagation(); toggleFav(parseInt(e.target.dataset.fav)); return; }
       const noteEl = e.target.closest('.card-note, .note-btn');
       if (noteEl) {
         const slot = noteEl.dataset.noteSlot ? parseInt(noteEl.dataset.noteSlot) : undefined;
