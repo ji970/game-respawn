@@ -1228,9 +1228,17 @@ function onCardClick(resId) {
     if (input.trim() === '') {
       startTimer(r);
     } else {
-      const customMin = parseInt(input);
-      if (isNaN(customMin) || customMin <= 0) { toast('请输入有效的分钟数'); return; }
-      startTimer(r, customMin);
+      const raw = input.trim();
+      if (raw.includes('~') || raw.includes('-')) {
+        const parts = raw.split(/[~\-]/);
+        const cm = parseInt(parts[0]); const cx = parseInt(parts[1]);
+        if (isNaN(cm) || isNaN(cx) || cm <= 0 || cx <= 0) { toast('请输入有效的分钟数，如30~60'); return; }
+        startTimer(r, Math.min(cm,cx), Math.max(cm,cx));
+      } else {
+        const cm = parseInt(raw);
+        if (isNaN(cm) || cm <= 0) { toast('请输入有效的分钟数'); return; }
+        startTimer(r, cm);
+      }
     }
   } catch(e) {
     // prompt blocked by browser - use default time
@@ -1238,13 +1246,13 @@ function onCardClick(resId) {
   }
 }
 
-function startTimer(r, customMin) {
+function startTimer(r, customMin, customMax) {
   const timers = loadTimers();
   const now = Date.now();
   const island = islandSelections[r.id] || 1;
   const effMin = customMin || r.min;
-  const effMax = customMin || r.max;
-  const isVar = !customMin && r.v;
+  const effMax = customMax || customMin || r.max;
+  const isVar = customMax ? (customMin !== customMax) : (!customMin && r.v);
 
   const existingClones = (timers[r.id] && timers[r.id].clones) || {};
   const timerKey = r.id + '_' + Date.now();
@@ -1278,9 +1286,14 @@ function startTimer(r, customMin) {
     };
     saveTimers(timers);
     renderCards();
-    toast('⏱ ' + r.name + '（岛屿' + island + '）：' + formatTime(effMax));
+    toast('⏱ ' + r.name + '（岛屿' + island + '）：' + (isVar ? formatTime(effMin) + '~' + formatTime(effMax) : formatTime(effMax)));
     const msPerMin = testMode ? 1000 : 60000;
-    schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + effMax * msPerMin, timerKey);
+    if (isVar) {
+      schedulePush(r.name + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(effMax - effMin) + '【间隔时间】后', Date.now() + effMin * msPerMin, timerKey);
+      schedulePush(r.name + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(effMax), Date.now() + effMax * msPerMin, timerKey);
+    } else {
+      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + effMax * msPerMin, timerKey);
+    }
   }
 
   // Vibrate on mobile
