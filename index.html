@@ -1829,9 +1829,8 @@ async function subscribePush(reg, showToast = true) {
     } catch(e1) {
       // Keyless subscription failed, now try WITH VAPID key
       if (e1.name === 'TypeError') {
-        // TypeError means PushManager itself is broken, not the key
-        pushErrorMsg = 'PushManager故障: ' + e1.message;
-        if (showToast) toast(pushErrorMsg);
+        pushErrorMsg = '推送功能不可用(' + e1.message + ')';
+        if (showToast) toast('推送失败：' + e1.message + '，请确认用的是Firefox国际版而非中国版');
         return;
       }
       // Other error - try with VAPID key
@@ -1908,10 +1907,19 @@ function getGuide(brandKey) {
   return guides[brandKey] || '<b>通用：</b>设置→电池→浏览器→<b>无限制</b>；多任务<b>锁定</b>浏览器；开启通知权限';
 }
 
+function getBrowserName() {
+  const ua = navigator.userAgent;
+  if (/Firefox/i.test(ua)) return /Mobile/i.test(ua) ? 'Firefox安卓' : 'Firefox';
+  if (/Edg/i.test(ua)) return 'Edge';
+  if (/Chrome/i.test(ua)) return 'Chrome';
+  if (/Safari/i.test(ua)) return 'Safari';
+  return ua.substring(0, 30);
+}
+
 function showDiagnostic() {
   const [brandName, brandKey] = getDeviceBrand();
   let guide = getGuide(brandKey);
-  guide += '<br>⚠️ 始终用<b>同一浏览器</b>打开，勿切换
+  guide += '<br>📱 <b>' + getBrowserName() + '</b> | ' + brandName;
 
   // Build problem-specific fix tips
   const permOk = Notification.permission === 'granted';
