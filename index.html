@@ -336,18 +336,20 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   position: absolute;
   top: 100%;
   left: 0;
+  right: 0;
   background: var(--surface2);
   border: 1px solid var(--accent);
   border-radius: 8px;
   padding: 4px;
   z-index: 21;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  white-space: nowrap;
 }
-.clone-popup.open { display: flex; gap: 4px; }
+.clone-popup.open { display: flex; flex-wrap: wrap; gap: 4px; }
 .clone-popup button {
-  padding: 3px 8px;
+  padding: 3px 6px;
   border-radius: 6px;
+  font-size: 12px;
+  min-width: 24px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
