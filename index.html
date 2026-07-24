@@ -1877,9 +1877,6 @@ function showDiagnostic() {
     fixTips = '<br><b style="color:#4caf50">各项检查正常</b><br>如果仍收不到通知，请按下方设备指引关闭省电限制';
   }
 
-  // Always show fallback option
-  }
-
   const d = document.getElementById('diagOverlay');
   document.getElementById('diagPerm').innerHTML = permOk
     ? '<span class="ok">✅ 已授权</span>' : '<span class="bad">❌ 未授权</span>';
@@ -1993,13 +1990,6 @@ document.addEventListener('DOMContentLoaded', init);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') setTimeout(checkTimers, 500);
 });
-
-// Wake lock to prevent phone from sleeping while page is open
-if ('wakeLock' in navigator) {
-  try {
-    navigator.wakeLock.request('screen').catch(() => {});
-  } catch(e) {}
-}
 
 </script>
 
