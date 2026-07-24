@@ -34,7 +34,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// Push notification (reserved for future server push)
+// Push notification
 self.addEventListener('push', e => {
   const data = e.data ? e.data.json() : {};
   const title = data.title || '物资刷新提醒';
@@ -42,9 +42,12 @@ self.addEventListener('push', e => {
     body: data.body || '有物资可能已刷新',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-72.png',
-    vibrate: [200, 100, 200],
+    vibrate: [200, 100, 200, 100, 200],
     tag: 'respawn-notify',
     renotify: true,
+    requireInteraction: true,
+    silent: false,
+    actions: [{ action: 'open', title: '查看' }],
   };
   e.waitUntil(self.registration.showNotification(title, options));
 });
