@@ -1767,22 +1767,31 @@ function initApp() {
 let pushSubscription = null;
 let pushErrorMsg = '';
 
-async function subscribePush(reg) {
+async function subscribePush(reg, showToast = true) {
   if (!('PushManager' in window)) {
     pushErrorMsg = '浏览器不支持 PushManager';
-    console.log('PushManager not available');
+    if (showToast) toast('浏览器不支持推送');
     return;
   }
   try {
-    if (Notification.permission !== 'granted') {
+    const curPerm = Notification.permission;
+    console.log('subscribePush: permission=' + curPerm);
+    if (curPerm === 'denied') {
+      pushErrorMsg = '通知权限已被阻止，需去浏览器设置→权限→通知→改为允许';
+      if (showToast) toast('通知权限已被阻止，请去浏览器设置开启');
+      return;
+    }
+    if (curPerm !== 'granted') {
       const p = await Notification.requestPermission();
       if (p !== 'granted') {
-        pushErrorMsg = '用户拒绝了通知权限';
-        toast('通知权限未开启，后台推送不可用');
+        pushErrorMsg = '用户拒绝了通知权限（结果：' + p + '）';
+        if (showToast) toast('通知权限未开启');
         return;
       }
     }
+    if (!reg) reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
+    console.log('Existing subscription:', sub ? 'yes' : 'none');
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -1792,12 +1801,13 @@ async function subscribePush(reg) {
     pushSubscription = sub;
     pushErrorMsg = '';
     document.getElementById('permBanner').classList.remove('show');
-    console.log('Push subscribed:', sub.endpoint.substring(0,50));
+    console.log('Push subscribed OK, endpoint:', sub.endpoint.substring(0,60));
+    if (showToast) toast('推送订阅成功！');
   } catch(e) {
-    pushErrorMsg = e.message || '未知错误';
-    console.error('Push subscribe failed:', e.message);
+    pushErrorMsg = e.name + ': ' + (e.message || '未知');
+    console.error('Push subscribe error:', e.name, e.message);
     document.getElementById('permBanner').classList.add('show');
-    toast('推送订阅失败，后台通知不可用');
+    if (showToast) toast('推送订阅失败：' + pushErrorMsg);
   }
 }
 
@@ -1872,7 +1882,7 @@ function showDiagnostic() {
   } else if (!permOk) {
     fixTips = '<br><b style="color:#ff9800">通知权限未开启</b><br>点下方"修复"按钮，在弹出的系统提示中点<b>允许</b><br>如果没弹出提示，说明浏览器已禁止，需手动去系统设置开启';
   } else if (!subOk) {
-    fixTips = '<br><b style="color:#ff9800">推送订阅失败</b><br>错误：' + (pushErrorMsg || '未知') + '<br><br>Chrome/Edge 在安卓上推送依赖 <b>Google Play 服务(GMS)</b><br>国产手机大多没有 GMS，所以订阅会失败<br><br>✅ 推荐：安装 <b>Firefox 国际版</b><br>下载：<b>mozilla.org</b> 直接下 APK，或酷安/APKPure 搜索<br>Firefox 推送走 Mozilla 服务器，国内直连可用<br><br>⚠️ 注意：国内应用商店的"火狐中国版"推送可能受限<br>优先用国际版，其次是手机自带浏览器<br>→ 或点"修复"重试（如果已装 GMS）';
+    fixTips = '<br><b style="color:#ff9800">推送订阅失败</b><br>错误：' + (pushErrorMsg || '未知') + '<br><br>Chrome/Edge 在安卓上推送依赖 <b>Google Play 服务(GMS)</b><br>国产手机大多没有 GMS，所以订阅会失败<br><br>✅ 推荐：安装 <b>Firefox 国际版</b>（不需要谷歌）<br>下载 APK（浏览器打开，下载安装即可）：<br> ① <a href="https://share.feijipan.com/s/wmH35bFc" target="_blank"><b>点此直接下载</b></a>（飞机盘网盘）<br> ② <b>GitHub</b>：github.com/mozilla-mobile/firefox-android/releases<br> 　找最新版下载 .apk 文件（打不开试试 ghproxy.com 加链接）<br> ③ <b>APKMirror</b>：apkmirror.com 搜 Firefox<br> 　纯 APK 站，不会跳谷歌<br>Firefox 推送走 Mozilla 服务器，国内直连可用<br><br>⚠️ 注意：国内应用商店的"火狐中国版"推送可能受限<br>优先用国际版，其次是手机自带浏览器<br>→ 或点"修复"重试（如果已装 GMS）';
   } else {
     fixTips = '<br><b style="color:#4caf50">各项检查正常</b><br>如果仍收不到通知，请按下方设备指引关闭省电限制';
   }
