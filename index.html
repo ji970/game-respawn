@@ -1774,29 +1774,41 @@ async function subscribePush(reg, showToast = true) {
     return;
   }
   try {
-    const curPerm = Notification.permission;
+    // Step 1: check permission
+    let curPerm = 'unknown';
+    try { curPerm = Notification.permission; } catch(e) { pushErrorMsg='步骤1-权限检查: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
     console.log('subscribePush: permission=' + curPerm);
     if (curPerm === 'denied') {
       pushErrorMsg = '通知权限已被阻止，需去浏览器设置→权限→通知→改为允许';
-      if (showToast) toast('通知权限已被阻止，请去浏览器设置开启');
+      if (showToast) toast(pushErrorMsg);
       return;
     }
     if (curPerm !== 'granted') {
-      const p = await Notification.requestPermission();
-      if (p !== 'granted') {
-        pushErrorMsg = '用户拒绝了通知权限（结果：' + p + '）';
-        if (showToast) toast('通知权限未开启');
-        return;
-      }
+      try {
+        const p = await Notification.requestPermission();
+        if (p !== 'granted') {
+          pushErrorMsg = '用户拒绝了通知权限（结果：' + p + '）';
+          if (showToast) toast(pushErrorMsg);
+          return;
+        }
+      } catch(e) { pushErrorMsg='步骤2-请求权限: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
     }
-    if (!reg) reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
+    // Step 3: get SW registration
+    try { if (!reg) reg = await navigator.serviceWorker.ready; } catch(e) { pushErrorMsg='步骤3-SW就绪: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
+    // Step 4: get existing subscription
+    let sub = null;
+    try { sub = await reg.pushManager.getSubscription(); } catch(e) { pushErrorMsg='步骤4-获取订阅: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
     console.log('Existing subscription:', sub ? 'yes' : 'none');
+    // Step 5: subscribe
     if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
-      });
+      try {
+        const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+        console.log('Key bytes length:', keyBytes.byteLength);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: keyBytes,
+        });
+      } catch(e) { pushErrorMsg='步骤5-订阅: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
     }
     pushSubscription = sub;
     pushErrorMsg = '';
@@ -1804,7 +1816,7 @@ async function subscribePush(reg, showToast = true) {
     console.log('Push subscribed OK, endpoint:', sub.endpoint.substring(0,60));
     if (showToast) toast('推送订阅成功！');
   } catch(e) {
-    pushErrorMsg = e.name + ': ' + (e.message || '未知');
+    pushErrorMsg = '步骤X-未知: ' + e.name + ': ' + (e.message || '未知');
     console.error('Push subscribe error:', e.name, e.message);
     document.getElementById('permBanner').classList.add('show');
     if (showToast) toast('推送订阅失败：' + pushErrorMsg);
