@@ -1806,7 +1806,7 @@ async function subscribePush(reg, showToast = true) {
     return;
   }
 
-  // Step 3: try subscribing (first without VAPID key to test)
+  // Step 3: try subscribing
   try {
     let sub = await reg.pushManager.getSubscription();
     if (sub) {
@@ -1816,39 +1816,44 @@ async function subscribePush(reg, showToast = true) {
       return;
     }
 
-    // First attempt: subscribe WITHOUT VAPID key to test if PushManager works at all
+    // Try with VAPID key first, then without
+    let err1 = null, err2 = null;
+    const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+
+    // Attempt 1: with VAPID key
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyBytes,
+      });
+    } catch(e) { err1 = e; }
+
+    if (sub) {
+      // Success with VAPID key
+      pushSubscription = sub;
+      pushErrorMsg = '';
+      document.getElementById('permBanner').classList.remove('show');
+      if (showToast) toast('推送订阅成功！');
+      return;
+    }
+
+    // Attempt 2: without VAPID key
     try {
       sub = await reg.pushManager.subscribe({ userVisibleOnly: true });
-      // If this succeeds, PushManager works but VAPID key is broken
-      pushErrorMsg = 'Push可用但VAPID密钥无效，联系管理员更新密钥';
-      pushSubscription = null;
-      // Unsubscribe from keyless subscription since it's useless for real push
+    } catch(e) { err2 = e; }
+
+    if (sub) {
+      // Keyless succeeded but VAPID failed - key is the problem
       await sub.unsubscribe();
-      if (showToast) toast('检测到VAPID密钥问题');
+      pushErrorMsg = 'VAPID密钥无效(' + (err1 ? err1.message : '') + ')';
+      if (showToast) toast('VAPID密钥问题，联系管理员');
       return;
-    } catch(e1) {
-      // Keyless subscription failed, now try WITH VAPID key
-      if (e1.name === 'TypeError') {
-        pushErrorMsg = '推送功能不可用(' + e1.message + ')';
-        if (showToast) toast('推送失败：' + e1.message + '，请确认用的是Firefox国际版而非中国版');
-        return;
-      }
-      // Other error - try with VAPID key
-      try {
-        const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: keyBytes,
-        });
-        pushSubscription = sub;
-        pushErrorMsg = '';
-        document.getElementById('permBanner').classList.remove('show');
-        if (showToast) toast('推送订阅成功！');
-      } catch(e2) {
-        pushErrorMsg = '订阅失败: ' + e2.message;
-        if (showToast) toast(pushErrorMsg);
-      }
     }
+
+    // Both failed
+    pushErrorMsg = '推送不可用：' + (err1 ? err1.message : '') + ' | ' + (err2 ? err2.message : '');
+    if (showToast) toast('推送订阅失败：' + pushErrorMsg);
+
   } catch(e) {
     pushErrorMsg = '未知错误: ' + e.message;
     if (showToast) toast(pushErrorMsg);
