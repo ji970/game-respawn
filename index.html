@@ -826,7 +826,7 @@ function notify(title, body) {
         icon: 'icons/icon-192.png',
         badge: 'icons/icon-72.png',
         vibrate: [200, 100, 200],
-        requireInteraction: true,
+
       });
       setTimeout(() => n.close(), 8000);
     } catch(e) { /* ignore */ }
@@ -1796,34 +1796,62 @@ async function subscribePush(reg) {
   }
 }
 
-function showDiagnostic() {
-  const ua = navigator.userAgent;
-  let brand = '', guide = '';
+function getDeviceBrand() {
+  // 1. Try User-Agent Client Hints (Chrome 90+, most reliable)
+  if (navigator.userAgentData && navigator.userAgentData.brands) {
+    const brands = navigator.userAgentData.brands.map(b => b.brand).join(' ');
+    const mobile = navigator.userAgentData.mobile;
+    const platform = navigator.userAgentData.platform || '';
 
-  if (/MIUI|Redmi|Xiaomi/i.test(ua)) {
-    brand = '小米/红米';
-    guide = '<b>小米/红米 设置方法：</b><br>1. 设置 → 省电与电池 → 应用智能省电 → 找到浏览器 → <b>无限制</b><br>2. 多任务界面长按浏览器 → 点🔒 <b>锁定</b><br>3. 设置 → 通知管理 → 浏览器 → <b>允许通知</b>';
-  } else if (/HUAWEI|Honor|HONOR/i.test(ua)) {
-    brand = '华为/荣耀';
-    guide = '<b>华为/荣耀 设置方法：</b><br>1. 设置 → 应用 → 应用启动管理 → 找到浏览器 → <b>手动管理</b>（三个开关全开）<br>2. 多任务界面下拉浏览器 <b>锁定</b><br>3. 设置 → 通知 → 浏览器 → <b>允许通知</b>';
-  } else if (/OPPO|PAAM00|PBAM00|PCAM00/i.test(ua)) {
-    brand = 'OPPO';
-    guide = '<b>OPPO 设置方法：</b><br>1. 设置 → 电池 → 应用耗电管理 → 浏览器 → <b>允许后台高耗电</b><br>2. 多任务界面下拉浏览器 <b>锁定</b><br>3. 设置 → 通知与状态栏 → 浏览器 → <b>允许通知</b>';
-  } else if (/vivo|V1818|V1936/i.test(ua)) {
-    brand = 'vivo';
-    guide = '<b>vivo 设置方法：</b><br>1. 设置 → 电池 → 后台高耗电 → 浏览器 → <b>允许</b><br>2. i管家 → 省电管理 → 浏览器 → <b>不限制</b><br>3. 多任务界面下拉浏览器 <b>锁定</b>';
-  } else if (/iPhone|iPad/i.test(ua)) {
-    brand = 'iPhone/iPad';
-    guide = '<b>iOS 设置方法：</b><br>1. 必须用 Safari 打开 → 分享 → <b>添加到主屏幕</b><br>2. 从主屏幕图标打开 App<br>3. 首次点击资源时会提示开启通知 → 点<b>允许</b><br>4. 设置 → 通知 → 关掉<b>定时推送摘要</b>';
-  } else if (/Samsung|SM-/i.test(ua)) {
-    brand = '三星';
-    guide = '<b>三星 设置方法：</b><br>1. 设置 → 电池和设备维护 → 电池 → 后台使用限制 → 浏览器 → <b>不限制</b><br>2. 多任务界面点浏览器图标 → <b>保持打开</b>';
-  } else {
-    brand = '未识别';
-    guide = '<b>通用设置方法：</b><br>1. 在系统设置中找到 <b>电池/省电</b>，把浏览器的限制设为 <b>无限制</b><br>2. 多任务界面 <b>锁定</b> 浏览器<br>3. 确保通知权限已开启';
+    if (/Xiaomi|Redmi|MIUI/i.test(brands)) return ['小米/红米', 'xiaomi'];
+    if (/HUAWEI|Honor/i.test(brands)) return ['华为/荣耀', 'huawei'];
+    if (/OPPO/i.test(brands)) return ['OPPO', 'oppo'];
+    if (/vivo/i.test(brands)) return ['vivo', 'vivo'];
+    if (/Samsung/i.test(brands)) return ['三星', 'samsung'];
+    if (/OnePlus/i.test(brands)) return ['一加', 'oneplus'];
+    if (/realme/i.test(brands)) return ['realme', 'realme'];
+
+    // Check platform field
+    if (/Android/i.test(platform) && mobile) return ['Android', 'generic'];
+    if (/iPhone|iPad|iPod/i.test(platform)) return ['iPhone/iPad', 'ios'];
   }
 
-  guide += '<br><br>⚠️ 设置后如果换浏览器打开，通知会失效。请始终用<b>同一个浏览器</b>打开此页面。';
+  // 2. Fallback to UA string matching
+  const ua = navigator.userAgent;
+
+  if (/MIUI|Redmi|Xiaomi|HM /i.test(ua)) return ['小米/红米', 'xiaomi'];
+  if (/HUAWEI|Honor|HONOR|HW-|HWM|HUAWEI/i.test(ua)) return ['华为/荣耀', 'huawei'];
+  if (/OPPO|PAAM|PBAM|PCAM|PACM/i.test(ua)) return ['OPPO', 'oppo'];
+  if (/vivo|V18|V19|V20|V21|V22|V23|V24/i.test(ua)) return ['vivo', 'vivo'];
+  if (/Samsung|SM-|SAMSUNG/i.test(ua)) return ['三星', 'samsung'];
+  if (/OnePlus|LE2|ONEPLUS/i.test(ua)) return ['一加', 'oneplus'];
+  if (/realme|RMX/i.test(ua)) return ['realme', 'realme'];
+  if (/Meizu|MEIZU|MZ-/i.test(ua)) return ['魅族', 'meizu'];
+  if (/Lenovo|ZUK/i.test(ua)) return ['联想', 'lenovo'];
+  if (/ZTE|Nubia|NX/i.test(ua)) return ['努比亚/中兴', 'zte'];
+  if (/Pixel/i.test(ua)) return ['Pixel', 'pixel'];
+  if (/iPhone|iPad|iPod/i.test(ua)) return ['iPhone/iPad', 'ios'];
+  if (/Android/i.test(ua)) return ['Android', 'generic'];
+
+  return ['未知设备', 'unknown'];
+}
+
+function getGuide(brandKey) {
+  const guides = {
+    xiaomi: '<b>小米/红米 设置方法：</b><br>1. 设置 → 省电与电池 → 应用智能省电 → 浏览器 → <b>无限制</b><br>2. 多任务界面长按浏览器 → 点🔒 <b>锁定</b><br>3. 设置 → 通知管理 → 浏览器 → <b>允许通知</b>',
+    huawei: '<b>华为/荣耀 设置方法：</b><br>1. 设置 → 应用 → 应用启动管理 → 浏览器 → <b>手动管理</b>（三个全开）<br>2. 多任务界面下拉浏览器 <b>锁定</b><br>3. 设置 → 通知 → 浏览器 → <b>允许通知</b>',
+    oppo: '<b>OPPO/一加 设置方法：</b><br>1. 设置 → 电池 → 应用耗电管理 → 浏览器 → <b>允许后台高耗电</b><br>2. 多任务界面下拉浏览器 <b>锁定</b><br>3. 设置 → 通知与状态栏 → 浏览器 → <b>允许通知</b>',
+    vivo: '<b>vivo 设置方法：</b><br>1. 设置 → 电池 → 后台高耗电 → 浏览器 → <b>允许</b><br>2. i管家 → 省电管理 → 浏览器 → <b>不限制</b><br>3. 多任务界面下拉浏览器 <b>锁定</b>',
+    ios: '<b>iOS 设置方法：</b><br>1. 必须用 Safari 打开 → 分享 → <b>添加到主屏幕</b><br>2. 从主屏幕图标打开 App<br>3. 首次点击资源时会提示开启通知 → 点<b>允许</b><br>4. 设置 → 通知 → 关掉<b>定时推送摘要</b>',
+    samsung: '<b>三星 设置方法：</b><br>1. 设置 → 电池和设备维护 → 电池 → 后台使用限制 → 浏览器 → <b>不限制</b><br>2. 多任务界面点浏览器图标 → <b>保持打开</b>',
+  };
+  return guides[brandKey] || '<b>通用设置方法：</b><br>1. 在系统设置中找到 <b>电池/省电</b>，把浏览器的限制设为 <b>无限制</b><br>2. 多任务界面 <b>锁定</b> 浏览器<br>3. 确保通知权限已开启';
+}
+
+function showDiagnostic() {
+  const [brandName, brandKey] = getDeviceBrand();
+  let guide = getGuide(brandKey);
+  guide += '<br><br>⚠️ 设置后请始终用<b>同一个浏览器</b>打开此页面。';
 
   const d = document.getElementById('diagOverlay');
   document.getElementById('diagPerm').innerHTML = Notification.permission === 'granted'
@@ -1834,10 +1862,9 @@ function showDiagnostic() {
     ? '<span class="ok">✅ 支持</span>' : '<span class="bad">❌ 不支持</span>';
   document.getElementById('diagPm').innerHTML = 'PushManager' in window
     ? '<span class="ok">✅ 支持</span>' : '<span class="bad">❌ 不支持</span>';
-  document.getElementById('diagGuide').innerHTML = '<b>设备：</b>' + brand + '<br><br>' + guide;
+  document.getElementById('diagGuide').innerHTML = '<b>设备：</b>' + brandName + '<br><br>' + guide;
   d.classList.add('show');
 
-  // Close on backdrop click
   d.onclick = function(e) { if (e.target === d) d.classList.remove('show'); };
 }
 
