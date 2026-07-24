@@ -1769,57 +1769,89 @@ let pushErrorMsg = '';
 
 async function subscribePush(reg, showToast = true) {
   if (!('PushManager' in window)) {
-    pushErrorMsg = '浏览器不支持 PushManager';
-    if (showToast) toast('浏览器不支持推送');
+    pushErrorMsg = '浏览器不支持推送';
+    if (showToast) toast(pushErrorMsg);
     return;
   }
-  try {
-    // Step 1: check permission
-    let curPerm = 'unknown';
-    try { curPerm = Notification.permission; } catch(e) { pushErrorMsg='步骤1-权限检查: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
-    console.log('subscribePush: permission=' + curPerm);
-    if (curPerm === 'denied') {
-      pushErrorMsg = '通知权限已被阻止，需去浏览器设置→权限→通知→改为允许';
+
+  // Step 1: check notification permission
+  const curPerm = Notification.permission;
+  if (curPerm === 'denied') {
+    pushErrorMsg = '通知权限已被阻止，去浏览器设置→权限→开启通知';
+    if (showToast) toast(pushErrorMsg);
+    return;
+  }
+  if (curPerm !== 'granted') {
+    try {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') {
+        pushErrorMsg = '未授权通知权限(' + p + ')';
+        if (showToast) toast(pushErrorMsg);
+        return;
+      }
+    } catch(e) {
+      pushErrorMsg = '请求权限失败: ' + e.message;
       if (showToast) toast(pushErrorMsg);
       return;
     }
-    if (curPerm !== 'granted') {
-      try {
-        const p = await Notification.requestPermission();
-        if (p !== 'granted') {
-          pushErrorMsg = '用户拒绝了通知权限（结果：' + p + '）';
-          if (showToast) toast(pushErrorMsg);
-          return;
-        }
-      } catch(e) { pushErrorMsg='步骤2-请求权限: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
+  }
+
+  // Step 2: get SW registration
+  try {
+    if (!reg) reg = await navigator.serviceWorker.ready;
+  } catch(e) {
+    pushErrorMsg = 'SW未就绪: ' + e.message;
+    if (showToast) toast(pushErrorMsg);
+    return;
+  }
+
+  // Step 3: try subscribing (first without VAPID key to test)
+  try {
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      pushSubscription = sub;
+      pushErrorMsg = '';
+      if (showToast) toast('推送已订阅');
+      return;
     }
-    // Step 3: get SW registration
-    try { if (!reg) reg = await navigator.serviceWorker.ready; } catch(e) { pushErrorMsg='步骤3-SW就绪: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
-    // Step 4: get existing subscription
-    let sub = null;
-    try { sub = await reg.pushManager.getSubscription(); } catch(e) { pushErrorMsg='步骤4-获取订阅: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
-    console.log('Existing subscription:', sub ? 'yes' : 'none');
-    // Step 5: subscribe
-    if (!sub) {
+
+    // First attempt: subscribe WITHOUT VAPID key to test if PushManager works at all
+    try {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true });
+      // If this succeeds, PushManager works but VAPID key is broken
+      pushErrorMsg = 'Push可用但VAPID密钥无效，联系管理员更新密钥';
+      pushSubscription = null;
+      // Unsubscribe from keyless subscription since it's useless for real push
+      await sub.unsubscribe();
+      if (showToast) toast('检测到VAPID密钥问题');
+      return;
+    } catch(e1) {
+      // Keyless subscription failed, now try WITH VAPID key
+      if (e1.name === 'TypeError') {
+        // TypeError means PushManager itself is broken, not the key
+        pushErrorMsg = 'PushManager故障: ' + e1.message;
+        if (showToast) toast(pushErrorMsg);
+        return;
+      }
+      // Other error - try with VAPID key
       try {
         const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
-        console.log('Key bytes length:', keyBytes.byteLength);
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: keyBytes,
         });
-      } catch(e) { pushErrorMsg='步骤5-订阅: '+e.name+' '+e.message; if(showToast)toast(pushErrorMsg); return; }
+        pushSubscription = sub;
+        pushErrorMsg = '';
+        document.getElementById('permBanner').classList.remove('show');
+        if (showToast) toast('推送订阅成功！');
+      } catch(e2) {
+        pushErrorMsg = '订阅失败: ' + e2.message;
+        if (showToast) toast(pushErrorMsg);
+      }
     }
-    pushSubscription = sub;
-    pushErrorMsg = '';
-    document.getElementById('permBanner').classList.remove('show');
-    console.log('Push subscribed OK, endpoint:', sub.endpoint.substring(0,60));
-    if (showToast) toast('推送订阅成功！');
   } catch(e) {
-    pushErrorMsg = '步骤X-未知: ' + e.name + ': ' + (e.message || '未知');
-    console.error('Push subscribe error:', e.name, e.message);
-    document.getElementById('permBanner').classList.add('show');
-    if (showToast) toast('推送订阅失败：' + pushErrorMsg);
+    pushErrorMsg = '未知错误: ' + e.message;
+    if (showToast) toast(pushErrorMsg);
   }
 }
 
