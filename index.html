@@ -1867,7 +1867,7 @@ function showDiagnostic() {
   } else if (!permOk) {
     fixTips = '<br><b style="color:#ff9800">通知权限未开启</b><br>点下方"修复"按钮，在弹出的系统提示中点<b>允许</b><br>如果没弹出提示，说明浏览器已禁止，需手动去系统设置开启';
   } else if (!subOk) {
-    fixTips = '<br><b style="color:#ff9800">推送订阅失败</b><br>可能原因：网络问题、浏览器限制、VAPID 密钥不匹配<br>点下方"修复"按钮重试，或尝试用系统自带浏览器打开';
+    fixTips = '<br><b style="color:#ff9800">推送订阅失败</b><br>可能是网络问题，或者手机<b>没有 Google Play 服务</b><br>Chrome 推送依赖 GMS，部分国产手机默认不装<br>→ 点"修复"重试<br>→ 或换 <b>Edge 浏览器</b>（Edge 推送不依赖 GMS）<br>→ 也可试试<b>手机自带浏览器</b>';
   } else {
     fixTips = '<br><b style="color:#4caf50">各项检查正常</b><br>如果仍收不到通知，请按下方设备指引关闭省电限制';
   }
