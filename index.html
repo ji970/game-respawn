@@ -463,13 +463,19 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function deviceFingerprint() {
-  // Stable properties that don't change per browser session
+  // Stable hardware properties + unique install ID
+  let uid = localStorage.getItem('device_uid');
+  if (!uid) {
+    uid = crypto.randomUUID();
+    localStorage.setItem('device_uid', uid);
+  }
   const ua = navigator.userAgent;
   const platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
   const parts = [
     screen.width + 'x' + screen.height,
     platform,
     navigator.hardwareConcurrency || '0',
+    uid,
   ];
   return parts.join('|');
 }
@@ -576,11 +582,12 @@ async function activate() {
       const existing = await checkRes.json();
 
       if (existing.length > 0 && existing[0].device !== device) {
-        // Check if same device with different fingerprint format
-        const oldScreen = existing[0].device.split('|')[0];
-        const newScreen = device.split('|')[0];
-        if (oldScreen === newScreen) {
-          // Same screen = same device, update to new fingerprint
+        const oldFp = existing[0].device.split('|');
+        const newFp = device.split('|');
+        // Allow migration: old 3-part fingerprint matches first 3 parts of new 4-part fingerprint
+        const isMigration = oldFp.length === 3 && newFp.length === 4 && oldFp.join('|') === newFp.slice(0, 3).join('|');
+        if (isMigration) {
+          // Update to new format with UUID
           await fetch(SUPABASE_URL + '/rest/v1/activations?id=eq.' + existing[0].id, {
             method: 'PATCH',
             headers: {
