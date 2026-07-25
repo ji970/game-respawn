@@ -474,21 +474,13 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
-  // Stable hardware properties + unique install ID
-  let uid = localStorage.getItem('device_uid');
-  if (!uid) {
-    uid = crypto.randomUUID();
-    localStorage.setItem('device_uid', uid);
-  }
   const ua = navigator.userAgent;
   const platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
-  const parts = [
+  return [
     screen.width + 'x' + screen.height,
     platform,
     navigator.hardwareConcurrency || '0',
-    uid,
-  ];
-  return parts.join('|');
+  ].join('|');
 }
 
 async function hmacHex(message, secret) {
@@ -589,12 +581,17 @@ async function activate() {
       );
       const existing = await checkRes.json();
 
-      if (existing.length > 0 && existing[0].device !== device) {
-        // Allow migration: old 3-part fingerprint → new 4-part with UUID
-        const oldFp = existing[0].device.split('|');
-        const newFp = device.split('|');
-        const isMigration = oldFp.length === 3 && newFp.length === 4 && oldFp.join('|') === newFp.slice(0, 3).join('|');
-        if (isMigration) {
+      if (existing.length > 0) {
+        // Compare only hardware parts (first 3) to support cross-browser + migration from UUID format
+        const oldHw = existing[0].device.split('|').slice(0, 3).join('|');
+        const newHw = device.split('|').slice(0, 3).join('|');
+        if (oldHw !== newHw) {
+          errEl.textContent = '此激活码已在其他设备使用';
+          btn.disabled = false; btn.textContent = '激活';
+          return;
+        }
+        // If fingerprint format changed (e.g. UUID added/removed), update to current
+        if (existing[0].device !== device) {
           await fetch(SUPABASE_URL + '/rest/v1/activations?id=eq.' + existing[0].id, {
             method: 'PATCH',
             headers: {
@@ -605,10 +602,6 @@ async function activate() {
             },
             body: JSON.stringify({ device: device }),
           });
-        } else {
-          errEl.textContent = '此激活码已在其他设备使用';
-          btn.disabled = false; btn.textContent = '激活';
-          return;
         }
       }
 
