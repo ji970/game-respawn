@@ -493,8 +493,13 @@ async function checkActivation() {
   const act = getActivation();
   if (!act || !act.expiryHex || !act.sig) return false;
 
-  // Verify signature
-  const expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  // Verify signature: support both old (8-char, no nonce) and new (4-char, with nonce) formats
+  let expectedSig;
+  if (act.nonce !== undefined) {
+    expectedSig = (await hmacHex(act.expiryHex + act.nonce, ACTIVATION_SECRET)).slice(0, 4);
+  } else {
+    expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  }
   if (act.sig !== expectedSig) return false;
 
   // Check device binding (local fingerprint)
@@ -521,14 +526,29 @@ async function activate() {
   }
 
   const expiryHex = input.slice(0, 8);
-  const sig = input.slice(8, 16);
 
-  // Verify signature
-  const expectedSig = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
-  if (sig !== expectedSig) {
-    errEl.textContent = '激活码无效';
-    btn.disabled = false; btn.textContent = '激活';
-    return;
+  // Try new format first (8+4+4): expiry + nonce + 4-char sig
+  const newNonce = input.slice(8, 12);
+  const newSig = input.slice(12, 16);
+  const expectedNew = (await hmacHex(expiryHex + newNonce, ACTIVATION_SECRET)).slice(0, 4);
+
+  let sig, nonce;
+  if (newSig === expectedNew) {
+    // New format
+    sig = newSig;
+    nonce = newNonce;
+  } else {
+    // Try old format (8+8): expiry + 8-char sig, no nonce
+    const oldSig = input.slice(8, 16);
+    const expectedOld = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+    if (oldSig === expectedOld) {
+      sig = oldSig;
+      nonce = undefined;
+    } else {
+      errEl.textContent = '激活码无效';
+      btn.disabled = false; btn.textContent = '激活';
+      return;
+    }
   }
 
   // Check not expired
@@ -584,12 +604,14 @@ async function activate() {
   }
 
   // Save locally
-  localStorage.setItem('activation', JSON.stringify({
+  const actData = {
     expiryHex: expiryHex,
     sig: sig,
     activatedAt: Date.now(),
     device: device,
-  }));
+  };
+  if (nonce !== undefined) actData.nonce = nonce;
+  localStorage.setItem('activation', JSON.stringify(actData));
 
   document.getElementById('lockScreen').classList.add('hidden');
   updateStatus();
