@@ -463,11 +463,12 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function deviceFingerprint() {
+  // Stable properties that don't change per browser session
+  const ua = navigator.userAgent;
+  const platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
   const parts = [
     screen.width + 'x' + screen.height,
-    navigator.language,
-    navigator.platform,
-    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    platform,
     navigator.hardwareConcurrency || '0',
   ];
   return parts.join('|');
@@ -569,26 +570,18 @@ async function activate() {
     try {
       // Check if code already claimed
       const checkRes = await fetch(
-        SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash + '&select=id,device',
+        SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash + '&select=device',
         { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
       );
       const existing = await checkRes.json();
 
-      if (existing.length > 0) {
-        if (existing[0].device !== device) {
-          // Device changed (e.g. cleared data or different browser) — update binding
-          await fetch(SUPABASE_URL + '/rest/v1/activations?id=eq.' + existing[0].id, {
-            method: 'PATCH',
-            headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': 'Bearer ' + SUPABASE_KEY,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=minimal',
-            },
-            body: JSON.stringify({ device: device }),
-          });
-        }
-      } else {
+      if (existing.length > 0 && existing[0].device !== device) {
+        errEl.textContent = '此激活码已在其他设备使用';
+        btn.disabled = false; btn.textContent = '激活';
+        return;
+      }
+
+      if (existing.length === 0) {
         // Claim this code
         await fetch(SUPABASE_URL + '/rest/v1/activations', {
           method: 'POST',
