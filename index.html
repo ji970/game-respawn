@@ -1,3 +1,7 @@
+
+
+
+nana
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -107,6 +111,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   transition: border-color 0.2s, transform 0.15s;
 }
 .card:active { transform: scale(0.95); }
+.card.popup-open { z-index: 30; }
 .card.idle { border-color: transparent; }
 .card.running { border-color: var(--accent); animation: pulse 2s infinite; }
 .card.expired { border-color: var(--success); }
@@ -291,19 +296,6 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   border-color: var(--accent2);
   font-weight: 700;
 }
-
-.card-note {
-  font-size: 9px; color: #66bb6a; margin-top: 2px;
-  cursor: pointer; height: 14px; line-height: 14px; overflow: hidden;
-  white-space: nowrap; text-overflow: ellipsis; text-align: center;
-}
-.note-btn {
-  font-size: 9px; color: #66bb6a; cursor: pointer; margin-top: 2px;
-  padding: 1px 5px; border: 1px solid #2a2a45; border-radius: 6px;
-  background: transparent; display: inline-block;
-}
-.note-btn:active { background: #2a2a45; }
-
 .daily-badge {
   display: inline-block;
   background: #7c4dff;
@@ -315,8 +307,6 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 }
 
 
-
-.fav-star { position:absolute; top:2px; left:2px; width:18px; height:18px; border:none; background:transparent; font-size:12px; cursor:pointer; padding:0; line-height:18px; opacity:0.4; } .fav-star.on { opacity:1; }
 /* Clone button */
 .clone-btn {
   position: absolute;
@@ -425,7 +415,6 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   border: 1px solid var(--border);
 }
 .toast.show { opacity: 1; }
-
 </style>
 </head>
 <body>
@@ -473,12 +462,13 @@ const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
-function getDeviceId() {
-  // Hardware-based fingerprint - same across links on same device
+function deviceFingerprint() {
   const parts = [
     screen.width + 'x' + screen.height,
-    navigator.hardwareConcurrency || 0,
-    (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac/i) || [''])[0],
+    navigator.language,
+    navigator.platform,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    navigator.hardwareConcurrency || '0',
   ];
   return parts.join('|');
 }
@@ -503,16 +493,12 @@ async function checkActivation() {
   const act = getActivation();
   if (!act || !act.expiryHex || !act.sig) return false;
 
-  // Verify signature (supports both old 8+8 and new 8+4+4 formats)
-  let expectedSig;
-  if (act.nonce !== undefined) {
-    expectedSig = (await hmacHex(act.expiryHex + act.nonce, ACTIVATION_SECRET)).slice(0, 4);
-  } else {
-    expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
-  }
+  // Verify signature
+  const expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
   if (act.sig !== expectedSig) return false;
 
-  // Skip device check to avoid legacy fingerprint mismatches (Supabase enforces one-code-one-device)
+  // Check device binding (local fingerprint)
+  if (act.device && act.device !== deviceFingerprint()) return false;
 
   // Check expiry
   if (act.expiryHex === 'ffffffff') return true; // permanent
@@ -535,11 +521,10 @@ async function activate() {
   }
 
   const expiryHex = input.slice(0, 8);
-  const nonce = input.slice(8, 12);
-  const sig = input.slice(12, 16);
+  const sig = input.slice(8, 16);
 
   // Verify signature
-  const expectedSig = (await hmacHex(expiryHex + nonce, ACTIVATION_SECRET)).slice(0, 4);
+  const expectedSig = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
   if (sig !== expectedSig) {
     errEl.textContent = '激活码无效';
     btn.disabled = false; btn.textContent = '激活';
@@ -556,7 +541,7 @@ async function activate() {
     }
   }
 
-  const device = getDeviceId();
+  const device = deviceFingerprint();
   const codeHash = (await hmacHex(input, ACTIVATION_SECRET)).slice(0, 16);
 
   // Server verification (if Supabase configured)
@@ -570,15 +555,13 @@ async function activate() {
       const existing = await checkRes.json();
 
       if (existing.length > 0 && existing[0].device !== device) {
-        // One code, one device
-        if (existing.length >= 1) {
-          errEl.textContent = '此激活码已在其他设备使用';
-          btn.disabled = false; btn.textContent = '激活';
-          return;
-        }
+        errEl.textContent = '此激活码已在其他设备使用';
+        btn.disabled = false; btn.textContent = '激活';
+        return;
       }
 
-      if (existing.length === 0 || (existing.length === 1 && existing[0].device !== device)) {
+      if (existing.length === 0) {
+        // Claim this code
         await fetch(SUPABASE_URL + '/rest/v1/activations', {
           method: 'POST',
           headers: {
@@ -603,7 +586,6 @@ async function activate() {
   // Save locally
   localStorage.setItem('activation', JSON.stringify({
     expiryHex: expiryHex,
-    nonce: nonce,
     sig: sig,
     activatedAt: Date.now(),
     device: device,
@@ -639,10 +621,10 @@ const resources = [
 { id:8,  name:'曼陀罗', cat:'plant', min:60, max:60, icon:'' },
 { id:9,  name:'青魔王花', cat:'plant', min:60, max:60, icon:'' },
 { id:10, name:'幽灵百合', cat:'plant', min:40, max:40, icon:'' },
-{ id:11, name:'松露', cat:'plant', min:240, max:360, icon:'', v:true, note:'4~6h' },
+{ id:11, name:'松露', cat:'plant', min:300, max:300, icon:'' },
 { id:12, name:'红莲', cat:'plant', min:720, max:720, icon:'' },
 { id:13, name:'蓝莲', cat:'plant', min:720, max:720, icon:'' },
-{ id:14, name:'龙涎草', cat:'plant', min:540, max:900, icon:'', v:true, note:'9~15h' },
+{ id:14, name:'龙涎草', cat:'plant', min:720, max:720, icon:'' },
 { id:15, name:'水晶睡莲', cat:'plant', min:720, max:720, icon:'' },
 { id:16, name:'夕阳花', cat:'plant', min:720, max:960, icon:'', v:true, note:'天空岛，随机点位' },
 { id:17, name:'霜冻龙涎草', cat:'plant', min:540, max:900, icon:'', v:true, note:'北境' },
@@ -656,7 +638,7 @@ const resources = [
 { id:26, name:'猛犸', cat:'boss', min:540, max:540, icon:'' },
 { id:27, name:'雪猛犸', cat:'boss', min:900, max:900, icon:'' },
 { id:28, name:'霸王龙', cat:'boss', min:720, max:720, icon:'' },
-{ id:29, name:'暗黑霸王龙', cat:'boss', min:720, max:1440, icon:'', v:true, note:'12~24h' },
+{ id:29, name:'暗黑霸王龙', cat:'boss', min:1440, max:1440, icon:'' },
 { id:30, name:'上古鳄龙', cat:'boss', min:1440, max:1440, icon:'' },
 { id:31, name:'卡皮巴拉', cat:'rare', min:2880, max:4320, icon:'', v:true, note:'2~3天' },
 { id:32, name:'沼泽领主', cat:'rare', min:2880, max:4320, icon:'', v:true, note:'2~3天' },
@@ -664,62 +646,25 @@ const resources = [
 { id:40, name:'深海珊瑚', cat:"plant", min:540, max:900, icon:'', v:true, note:'9~15h' },
 { id:41, name:'金宝箱', cat:'chest', min:30, max:60, icon:'', v:true },
 { id:42, name:'银宝箱', cat:'chest', min:30, max:60, icon:'', v:true },
-{ id:43, name:'附魔石宝箱', cat:'chest', min:60, max:180, icon:'', v:true, note:'1~3h' },
-{ id:44, name:'水晶宝箱', cat:'chest', min:45, max:75, icon:'', v:true, note:'0.75~1.25h' },
-{ id:45, name:'黑曜石宝箱', cat:'chest', min:120, max:240, icon:'', v:true, note:'2~4h' },
+{ id:43, name:'附魔石宝箱', cat:'chest', min:60, max:60, icon:'' },
+{ id:44, name:'水晶宝箱', cat:'chest', min:60, max:60, icon:'' },
+{ id:45, name:'黑曜石宝箱', cat:'chest', min:180, max:180, icon:'' },
 { id:46, name:'纳坦岛宝箱', cat:'chest', min:180, max:180, icon:'' },
 { id:47, name:'天空专家宝箱', cat:'chest', min:180, max:180, icon:'' },
 { id:48, name:'天空大师宝箱', cat:'chest', min:180, max:180, icon:'' },
-{ id:49, name:'熔火龙', cat:'dragon', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
-{ id:50, name:'北境骨龙', cat:'dragon', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
-{ id:51, name:'苍穹幻龙', cat:'dragon', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
+{ id:49, name:'熔火龙', cat:'dragon', min:4320, max:5760, icon:'', v:true, note:'3~4天' },
+{ id:50, name:'北境骨龙', cat:'dragon', min:4320, max:5760, icon:'', v:true, note:'3~4天' },
+{ id:51, name:'苍穹幻龙', cat:'dragon', min:4320, max:5760, icon:'', v:true, note:'3~4天' },
 { id:52, name:'海底大触手精英怪', cat:'elite', min:180, max:360, icon:'', v:true, note:'海底，3~6h' },
-{ id:53, name:'海底精英怪', cat:'elite', min:150, max:210, icon:'', v:true, note:'海底 2.5~3.5h' },
-{ id:54, name:'天空岛精英怪', cat:'elite', min:150, max:210, icon:'', v:true, note:'天空岛 2.5~3.5h' },
+{ id:53, name:'海底精英怪', cat:'elite', min:180, max:180, icon:'', note:'海底' },
+{ id:54, name:'天空岛精英怪', cat:'elite', min:180, max:180, icon:'', note:'天空岛' },
 { id:55, name:'淘气仙灵', cat:"elite", min:360, max:480, icon:'', v:true, note:'6~8h' },
-{ id:56, name:'瓦雷亚宝箱', cat:'chest', min:180, max:300, icon:'', v:true, note:'3~5h' },
-{ id:57, name:'从容花苞', cat:'plant', min:60, max:120, icon:'', v:true, note:'1~2h' },
-  { id:59, name:'金甲海马', cat:'elite', min:660, max:900, icon:'', v:true, note:'11~15h' },
-  { id:60, name:'真龙宝藏', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  { id:61, name:'真龙印宝箱', cat:'chest', min:540, max:780, icon:'', v:true, note:'9~13h' },
-  { id:62, name:'柱子法师', cat:'elite', min:345, max:375, icon:'', v:true, note:'5.75~6.25h' },
-  { id:63, name:'小型法师', cat:'elite', min:150, max:210, icon:'', v:true, note:'2.5~3.5h' },
-  { id:64, name:'海鳄龙', cat:'rare', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
-  { id:65, name:'北境犀鸟', cat:'elite', min:1380, max:1500, icon:'', v:true, note:'23~25h' },
-  { id:66, name:'大贝壳', cat:'elite', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  { id:67, name:'云斑鹦鸟', cat:'elite', min:360, max:480, icon:'', v:true, note:'6~8h' },
-  { id:68, name:'龟壳珍宝', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  { id:69, name:'芙蕾雅宝箱', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  { id:70, name:'邓氏鱼', cat:'elite', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  { id:71, name:'帝王蟹', cat:'elite', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  { id:72, name:'水猴子', cat:'elite', min:240, max:480, icon:'', v:true, note:'4~8h' },
-  { id:73, name:'小海豚', cat:'elite', min:90, max:210, icon:'', v:true, note:'1.5~3.5h' },
-  { id:74, name:'龙鱼王', cat:'elite', min:840, max:1560, icon:'', v:true, note:'14~26h' },
-  { id:75, name:'嘲风金翎', cat:'elite', min:540, max:780, icon:'', v:true, note:'9~13h' },
-  { id:76, name:'神酒', cat:'plant', min:360, max:480, icon:'', v:true, note:'6~8h' },
-  { id:77, name:'暴动矿源虫', cat:'elite', min:240, max:360, icon:'', v:true, note:'4~6h' },
-  { id:78, name:'聚变矿源虫', cat:'elite', min:330, max:390, icon:'', v:true, note:'5.5~6.5h' },
-  { id:79, name:'矿源巨蝎', cat:'elite', min:720, max:960, icon:'', v:true, note:'12~16h' },
-  { id:80, name:'希乌奈斯花', cat:'plant', min:120, max:120, icon:'', note:'2h' },
-  { id:81, name:'蓬莱仙', cat:'plant', min:180, max:360, icon:'', v:true, note:'3~6h' },
-  { id:82, name:'阿米特', cat:'elite', min:720, max:1440, icon:'', v:true, note:'12~24h' },
-  { id:83, name:'远古花苞', cat:'plant', min:540, max:780, icon:'', v:true, note:'9~13h' },
-  { id:84, name:'符文漩涡', cat:'elite', min:660, max:840, icon:'', v:true, note:'11~14h' },
-  { id:85, name:'噬星兽', cat:'elite', min:360, max:360, icon:'', note:'6h' },
-  { id:86, name:'星梦之匣', cat:'chest', min:240, max:240, icon:'', note:'4h' },
-  { id:87, name:'水晶矿', cat:'chest', min:30, max:30, icon:'', note:'30min' },
-  { id:88, name:'日冕草', cat:'plant', min:120, max:180, icon:'', v:true, note:'2~3h' },
-  { id:89, name:'美人鱼鳞片', cat:'plant', min:660, max:780, icon:'', v:true, note:'11~13h' },
-  { id:90, name:'钻头', cat:'elite', min:0, max:0, icon:'', note:'剩余时间+10min提醒【波动2min】' },
-  { id:91, name:'大企鹅', cat:'elite', min:180, max:420, icon:'', v:true, note:'3~7h' },
-  { id:92, name:'勇猛勋章', cat:'elite', min:240, max:480, icon:'', v:true, note:'4~8h' },
-  { id:93, name:'通灵白猿', cat:'elite', min:360, max:720, icon:'', v:true, note:'6~12h' },
-  { id:94, name:'弥莲', cat:'plant', min:540, max:900, icon:'', v:true, note:'9~15h' },
-  { id:95, name:'异星宝箱', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
-  ];
+{ id:56, name:'瓦雷亚宝箱', cat:'chest', min:180, max:180, icon:'', note:'瓦雷亚' },
+{ id:57, name:'从容花苞', cat:'plant', min:120, max:240, icon:'', v:true, note:'2~4h' },
+{ id:58, name:'普通花苞', cat:'plant', min:1440, max:2880, icon:'', v:true, note:'1~2天' }
+];
 
 const categories = [
-  { key:'fav', label:'⭐ 常用' },
   { key:'active', label:'⏱ 活跃计时' },
   { key:'crop',    label:'🌾 农作物' },
   { key:'plant',   label:'🌿 稀有植物' },
@@ -773,7 +718,8 @@ function notify(title, body) {
         icon: 'icons/icon-192.png',
         badge: 'icons/icon-72.png',
         vibrate: [200, 100, 200],
-
+        tag: 'respawn-notify',
+        renotify: true,
       });
       setTimeout(() => n.close(), 8000);
     } catch(e) { /* ignore */ }
@@ -820,46 +766,6 @@ function formatCountdown(remainingSeconds) {
   return parts.join('');
 }
 
-
-// ====== 备注功能 ======
-function loadNotes() {
-  try { return JSON.parse(localStorage.getItem('resource_notes')) || {}; }
-  catch(e) { return {}; }
-}
-function getResourceNoteHtml(rid) {
-  const notes = loadNotes();
-  const note = notes[rid];
-  if (note) {
-    return '<div class="card-note" data-note-rid="'+rid+'">'+escHtml(note)+'</div>';
-  }
-  return '<div class="note-btn" data-note-rid="'+rid+'">+ 备注</div>';
-}
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function cloneNoteHtml(rid, slot) {
-  const notes = loadNotes();
-  const key = rid + '_c' + slot;
-  const note = notes[key];
-  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+escHtml(note)+'</div>';
-  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">+ 备注</div>';
-}
-function editNote(rid, slot) {
-  const notes = loadNotes();
-  const key = slot ? rid + '_c' + slot : rid;
-  const old = notes[key] || '';
-  const input = prompt('备注位置信息：', old);
-  if (input === null) return;
-  if (input.trim() === '') {
-    delete notes[key];
-  } else {
-    notes[key] = input.trim();
-  }
-  localStorage.setItem('resource_notes', JSON.stringify(notes));
-  renderCards();
-}
-
-
-function loadFavs(){try{return JSON.parse(localStorage.getItem("favs"))||[]}catch(e){return[]}}
-function toggleFav(rid){let f=loadFavs();const i=f.indexOf(rid);if(i<0)f.push(rid);else f.splice(i,1);localStorage.setItem("favs",JSON.stringify(f));renderCards();}
 function renderNav() {
   const nav = document.getElementById('nav');
   nav.innerHTML = categories.map(c =>
@@ -878,44 +784,17 @@ function renderCards() {
   const main = document.getElementById('main');
   const timers = loadTimers();
   let items;
-  let cloneItems = [];
-  if (currentCat === 'fav') {
-    items = resources.filter(r => loadFavs().includes(r.id));
-  } else if (currentCat === 'active') {
-    // Show resources with active or completed timers + their clones
-    items = resources.filter(r => {
-      const s = timers[r.id];
-      if (!s) return false;
-      // Check main timer
-      if (s.startTime || s.daily) return true;
-      // Check clones
-      if (s.clones) {
-        for (const c of Object.values(s.clones)) {
-          if (c && (c.minNotified === false || c.maxNotified === false)) return true;
-        }
-      }
-      return false;
-    });
-    // Build clone entries for active view
-    items.forEach(r => {
-      const s = timers[r.id];
-      if (s && s.clones) {
-        [1,2,3,4,5,6,7,8,9,10].forEach(slot => {
-          const c = s.clones[slot];
-          if (c) {
-            cloneItems.push({ rid: r.id, slot: slot, clone: c });
-          }
-        });
-      }
-    });
+  if (currentCat === 'active') {
+    // Show resources with active or completed timers
+    items = resources.filter(r => !!timers[r.id]);
   } else {
     items = resources.filter(r => r.cat === currentCat);
   }
 
-  if (items.length === 0 && cloneItems.length === 0) {
+  if (items.length === 0) {
     main.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
       <div style="font-size:48px;margin-bottom:12px">⏱️</div>
-      <div>${currentCat === 'fav' ? '暂无常用物资，点击⭐添加' : (currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资')}</div>
+      <div>${currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资'}</div>
     </div>`;
     return;
   }
@@ -941,40 +820,30 @@ function renderCards() {
         countdownHtml = '每日定时中';
       } else {
       const ADV = 2;
-      if (state.minNotified === false && (state.variable || state.min !== state.max)) {
-        nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
+      if (state.minNotified === false && r.min !== r.max) {
+        nextCheckSec = Math.max(0, r.min * 60 - ADV * 60) - elapsed;
         if (nextCheckSec <= 0) nextCheckSec = 0;
       }
       if (state.maxNotified === false) {
-        const maxSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+        const maxSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
         if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
         if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
       }
-      if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+      if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
       if (nextCheckSec <= 0) {
         countdownHtml = '已刷新';
         countdownCls = 'expired-text';
       } else {
-        const cdText = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
-        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
-          countdownHtml = '已刷新 ' + cdText + '后结束';
-        } else {
-          countdownHtml = cdText;
-        }
+        countdownHtml = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
       }
       }
     } else if (isExpired) {
-      if (state.min !== state.max) {
-        countdownHtml = '✅ 已刷新 至' + formatTime(state.max - state.min) + '后结束';
-      } else {
-        countdownHtml = '✅ 已刷新';
-      }
+      countdownHtml = '✅ 已刷新';
       countdownCls = 'expired-text';
     }
 
-    const timeLabel = r.min === 0 ? '自定义' : (r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min));
-    const timeHint = r.min === 0 && r.note ? '<div style="font-size:8px;color:var(--text2);margin-top:1px">'+r.note+'</div>' : '';
-    const noteAttr = r.note && r.min !== 0 ? ` title="${r.note}"` : '';
+    const timeLabel = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min);
+    const noteAttr = r.note ? ` title="${r.note}"` : '';
 
     const island = (state && state.island) || (islandSelections[r.id]) || 1;
     const islandHtml = '<div class="island-wrap">' +
@@ -995,14 +864,12 @@ function renderCards() {
         </div>
         <div class="name">${r.name}</div>
         <div class="time-label">${timeLabel}</div>
-        ${timeHint}
         ${dailyBadge}
-        ${getResourceNoteHtml(r.id)}
         <div class="countdown ${countdownCls}">${countdownHtml}</div>
         ${islandHtml}
-        <button class="fav-star ${loadFavs().includes(r.id)?"on":""}" data-fav="${r.id}">⭐</button><button class="clone-btn" data-rid="${r.id}">+</button>
+        <button class="clone-btn" data-rid="${r.id}">+</button>
         <div class="clone-popup" data-rid="${r.id}">
-          ${[1,2,3,4,5,6,7,8,9,10].map(n => {
+          ${[1,2,3].map(n => {
             const clone = state && state.clones && state.clones[n];
             const busy = clone && (clone.minNotified === false || clone.maxNotified === false);
             const text = busy ? n + ' ⏳' : (clone ? n + ' ✓' : n);
@@ -1010,7 +877,7 @@ function renderCards() {
           }).join('')}
         </div>
         <div class="clone-dots">
-          ${[1,2,3,4,5,6,7,8,9,10].map(n => {
+          ${[1,2,3].map(n => {
             const clone = state && state.clones && state.clones[n];
             const active = clone && (clone.minNotified === false || clone.maxNotified === false);
             return '<div class="clone-dot'+(active?' active':'')+'"></div>';
@@ -1019,115 +886,23 @@ function renderCards() {
       </div>`;
   }).join('')}</div>`;
 
-  // Add clone cards in active view
-  if (currentCat === 'active' && cloneItems.length > 0) {
-    main.innerHTML += '<div style="font-size:12px;color:var(--text2);padding:12px 4px 4px">分身计时</div><div class="grid">' +
-    cloneItems.map(ci => {
-      const r = resources.find(x => x.id === ci.rid);
-      const c = ci.clone;
-      const mult = testMode ? 60 : 1;
-      const elapsed = (Date.now() - c.startTime) / 1000 * mult;
-      const adv = 2;
-      // For variable resources, show min->max countdown
-      let nextSec = Math.max(0, c.max * 60 - adv * 60 - elapsed);
-      if (c.variable && c.minNotified === false) {
-        const minSec = Math.max(0, c.min * 60 - adv * 60 - elapsed);
-        if (minSec > 0 && minSec < nextSec) nextSec = minSec;
-      }
-      if (nextSec <= 0) nextSec = 0;
-      let cdText;
-      if (nextSec <= 0) {
-        cdText = '✅ 已刷新';
-      } else {
-        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
-        if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
-          cdText = '已刷新 ' + t2 + '后结束';
-        } else {
-          cdText = t2;
-        }
-      }
-      const ciIsland = ci.clone.island || 1;
-      return '<div class="card running" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
-        '<button class="cancel-btn" style="display:block" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">&times;</button>' +
-        '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
-        '<div class="countdown">' + cdText + '</div>' +
-        '<div class="island-wrap"><button class="island-btn clone-island-btn" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">岛屿 ' + ciIsland + '</button>' +
-        '<div class="island-popup">' + Array.from({length:10},(_,i)=>'<button data-idx="'+(i+1)+'" data-cid="'+ci.rid+'" data-slot="'+ci.slot+'"'+(ciIsland===i+1?' class=\"sel\"':'')+'>'+(i+1)+'</button>').join('')+'</div></div>' +
-        (cloneNoteHtml(ci.rid, ci.slot)) +
-        '</div>';
-    }).join('') + '</div>';
-  }
-
-  // Clone card click handler
-  // Clone ❌ button handler
-  main.querySelectorAll('.cancel-btn[data-cid]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const rid = parseInt(btn.dataset.cid);
-      const slot = parseInt(btn.dataset.slot);
-      cancelTimer(rid, slot);
-      toast(resources.find(x => x.id === rid)?.name + ' 分身' + slot + ' 已停止');
-    });
-  });
-  // Clone card click - show info
-  main.querySelectorAll('.card[data-cid]').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.cancel-btn')) return;
-      const noteEl = e.target.closest('.card-note, .note-btn');
-      if (noteEl) {
-        editNote(parseInt(noteEl.dataset.noteRid), parseInt(noteEl.dataset.noteSlot));
-        return;
-      }
-      // Clone island popup toggle
-      const ciBtn = e.target.closest('.clone-island-btn');
-      if (ciBtn) {
-        const popup = ciBtn.parentElement.querySelector('.island-popup');
-        const wasOpen = popup.classList.contains('open');
-        closeAllPopups();
-        if (!wasOpen) popup.classList.add('open');
-        return;
-      }
-      // Clone island selection
-      const ciPopupBtn = e.target.closest('.island-popup button');
-      if (ciPopupBtn && ciPopupBtn.dataset.cid) {
-        const idx = parseInt(ciPopupBtn.dataset.idx);
-        const timers = loadTimers();
-        if (timers[ciPopupBtn.dataset.cid]?.clones?.[ciPopupBtn.dataset.slot]) {
-          timers[ciPopupBtn.dataset.cid].clones[ciPopupBtn.dataset.slot].island = idx;
-          saveTimers(timers);
-        }
-        closeAllPopups();
-        renderCards();
-        return;
-      }
-      const c = (loadTimers()[parseInt(card.dataset.cid)]?.clones || {})[parseInt(card.dataset.slot)];
-      if (c) {
-        const elapsed = Math.floor((Date.now() - c.startTime) / 60000);
-        toast((resources.find(x=>x.id===parseInt(card.dataset.cid))?.name||'')+' 分身'+card.dataset.slot+' 已过'+formatTime(elapsed)+' 剩余'+formatTime(Math.max(0,c.max-elapsed)));
-      }
-    });
-  });
-
   // Bind events
-  main.querySelectorAll('.card:not([data-cid])').forEach(card => {
+  main.querySelectorAll('.card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.classList.contains('cancel-btn')) return;
       if (e.target.closest('.island-wrap')) return;
-      if (e.target.classList.contains('fav-star')) { e.stopPropagation(); toggleFav(parseInt(e.target.dataset.fav)); return; }
-      const noteEl = e.target.closest('.card-note, .note-btn');
-      if (noteEl) {
-        const slot = noteEl.dataset.noteSlot ? parseInt(noteEl.dataset.noteSlot) : undefined;
-        editNote(parseInt(noteEl.dataset.noteRid), slot);
-        return;
-      }
       onCardClick(parseInt(card.dataset.id));
     });
   });
   main.querySelectorAll('.cancel-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      cancelTimer(parseInt(btn.dataset.id));
-      toast(resources.find(x => x.id === parseInt(btn.dataset.id))?.name + ' 计时已取消');
+      const rid = parseInt(btn.dataset.id);
+      const timers = loadTimers();
+      delete timers[rid];
+      saveTimers(timers);
+      toast(resources.find(x => x.id === rid)?.name + ' 所有计时已关闭');
+      renderCards();
     });
   });
   main.querySelectorAll('.island-btn').forEach(btn => {
@@ -1139,29 +914,13 @@ function renderCards() {
       if (!wasOpen) popup.classList.add('open');
     });
   });
-  main.querySelectorAll('.island-popup button:not([data-cid])').forEach(b => {
+  main.querySelectorAll('.island-popup button').forEach(b => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       const rid = parseInt(b.dataset.rid);
       const idx = parseInt(b.dataset.idx);
       selectIsland(rid, idx);
       closeAllPopups();
-    });
-  });
-  // Clone island popup buttons
-  main.querySelectorAll('.island-popup button[data-cid]').forEach(b => {
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const rid = parseInt(b.dataset.cid);
-      const slot = parseInt(b.dataset.slot);
-      const idx = parseInt(b.dataset.idx);
-      const timers = loadTimers();
-      if (timers[rid]?.clones?.[slot]) {
-        timers[rid].clones[slot].island = idx;
-        saveTimers(timers);
-      }
-      closeAllPopups();
-      renderCards();
     });
   });
   // Close popups when tapping outside
@@ -1173,7 +932,10 @@ function renderCards() {
       const popup = btn.parentElement.querySelector('.clone-popup');
       const wasOpen = popup.classList.contains('open');
       closeAllPopups();
-      if (!wasOpen) popup.classList.add('open');
+      if (!wasOpen) {
+        popup.classList.add('open');
+        btn.closest('.card').classList.add('popup-open');
+      }
     });
   });
   main.querySelectorAll('.clone-popup button').forEach(b => {
@@ -1210,56 +972,20 @@ function onCardClick(resId) {
     return;
   }
   if (state && (state.minNotified === false || state.maxNotified === false)) {
-    const elapsed = Math.floor((Date.now() - state.startTime) / 1000 / 60);
-    const island = state.island || 1;
-    if (r.v && state.minNotified === false) {
-      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后结束');
-    } else {
-      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，剩余' + formatTime(Math.max(0, r.max - elapsed)));
-    }
+    cancelTimer(resId);
     return;
   }
 
-  // Start timer - allow custom time
-  const label = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '无固定时间';
-  try {
-    const input = prompt(r.name + ' 默认刷新时间：' + label + (r.min === 0 ? '\n此物资无默认时间，请输入分钟数：' : '\n输入自定义分钟数（留空使用默认）：'), r.min === 0 ? '' : '');
-    if (input === null) return;
-    if (r.min === 0 && input.trim() === '') {
-      toast('请输入有效分钟数');
-      return;
-    }
-    if (input.trim() === '') {
-      startTimer(r);
-    } else {
-      const raw = input.trim();
-      if (raw.includes('~') || raw.includes('-')) {
-        const parts = raw.split(/[~\-]/);
-        const cm = parseInt(parts[0]); const cx = parseInt(parts[1]);
-        if (isNaN(cm) || isNaN(cx) || cm <= 0 || cx <= 0) { toast('请输入有效的分钟数，如30~60'); return; }
-        startTimer(r, Math.min(cm,cx), Math.max(cm,cx));
-      } else {
-        const cm = parseInt(raw);
-        if (isNaN(cm) || cm <= 0) { toast('请输入有效的分钟数'); return; }
-        startTimer(r, cm);
-      }
-    }
-  } catch(e) {
-    // prompt blocked by browser - use default time
-    startTimer(r);
-  }
+  // Start timer
+  startTimer(r);
 }
 
-function startTimer(r, customMin, customMax) {
+function startTimer(r) {
   const timers = loadTimers();
   const now = Date.now();
   const island = islandSelections[r.id] || 1;
-  const effMin = customMin || r.min;
-  const effMax = customMax || customMin || r.max;
-  const isVar = customMax ? (customMin !== customMax) : (!customMin && r.v);
 
   const existingClones = (timers[r.id] && timers[r.id].clones) || {};
-  const timerKey = r.id + '_' + Date.now();
 
   if (r.daily) {
     timers[r.id] = {
@@ -1270,7 +996,6 @@ function startTimer(r, customMin, customMax) {
       island: island,
       dailyNotified: {},
       clones: existingClones,
-      timerKey: timerKey,
     };
     saveTimers(timers);
     checkDailyTimers(r.id, timers[r.id]);
@@ -1279,24 +1004,27 @@ function startTimer(r, customMin, customMax) {
   } else {
     timers[r.id] = {
       startTime: now,
-      min: effMin,
-      max: effMax,
+      min: r.min,
+      max: r.max,
       minNotified: false,
       maxNotified: false,
-      variable: isVar,
+      variable: r.v || false,
       island: island,
       clones: existingClones,
-      timerKey: timerKey,
     };
     saveTimers(timers);
     renderCards();
-    toast('⏱ ' + r.name + '（岛屿' + island + '）：' + (isVar ? formatTime(effMin) + '~' + formatTime(effMax) : formatTime(effMax)));
+    const label = r.v
+      ? formatTime(r.min) + '后"可能刷新"，' + formatTime(r.max) + '后"必定刷新"'
+      : formatTime(r.max) + '后通知你';
+    toast('⏱ ' + r.name + '（岛屿' + island + '）：' + label);
+    // Schedule push for background notification
     const msPerMin = testMode ? 1000 : 60000;
-    if (isVar) {
-      schedulePush(r.name + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(effMax - effMin) + '【间隔时间】后', Date.now() + effMin * msPerMin, timerKey);
-      schedulePush(r.name + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(effMax), Date.now() + effMax * msPerMin, timerKey);
+    if (r.v) {
+      schedulePush(r.name + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * msPerMin);
+      schedulePush(r.name + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
     } else {
-      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + effMax * msPerMin, timerKey);
+      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin);
     }
   }
 
@@ -1319,27 +1047,13 @@ function startClone(rid, slot) {
     return;
   }
 
-  // Allow custom time for clones
-  let effMin = r.min, effMax = r.max, isVar = r.v || false;
-  const label = isVar ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '自定义';
-  try {
-    const input = prompt(r.name + ' 分身' + slot + ' 时间：' + label + '\n输入自定义分钟数（留空默认）：', '');
-    if (input === null) return;
-    if (input.trim() !== '') {
-      const cm = parseInt(input);
-      if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); return; }
-      effMin = cm; effMax = cm; isVar = false;
-    }
-  } catch(e) {}
   const island = islandSelections[rid] || 1;
-  const timerKey = rid + '_' + slot + '_' + Date.now();
   timers[rid].clones[slot] = {
     startTime: Date.now(),
-    min: effMin, max: effMax,
+    min: r.min, max: r.max,
     minNotified: false, maxNotified: false,
-    variable: isVar,
+    variable: r.v || false,
     island: island,
-    timerKey: timerKey,
   };
 
   saveTimers(timers);
@@ -1348,16 +1062,18 @@ function startClone(rid, slot) {
   if (navigator.vibrate) navigator.vibrate(50);
   const msPerMin = testMode ? 1000 : 60000;
   if (r.v) {
-    schedulePush(r.name + ' 分身' + slot + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(r.max - r.min) + '【间隔时间】后', Date.now() + r.min * msPerMin);
-    schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin, timerKey);
+    schedulePush(r.name + ' 分身' + slot + ' 可能已刷新', '（岛屿' + island + '）下限' + formatTime(r.min), Date.now() + r.min * msPerMin);
+    schedulePush(r.name + ' 分身' + slot + ' 必定已刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin);
   } else {
-    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin, timerKey);
+    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin);
   }
 }
 
 function closeAllPopups() {
   document.querySelectorAll('.island-popup.open').forEach(p => p.classList.remove('open'));
   document.querySelectorAll('.clone-popup.open').forEach(p => p.classList.remove('open'));
+  // Reset card z-index when closing popups
+  document.querySelectorAll('.card.popup-open').forEach(c => c.classList.remove('popup-open'));
 }
 function selectIsland(rid, islandNum) {
   islandSelections[rid] = islandNum;
@@ -1371,13 +1087,6 @@ function selectIsland(rid, islandNum) {
 
 function cancelTimer(resId, cloneSlot) {
   const timers = loadTimers();
-  const t = timers[resId];
-  // Cancel pending push notifications
-  if (cloneSlot && t && t.clones && t.clones[cloneSlot]) {
-    cancelPushQueue(t.clones[cloneSlot].timerKey);
-  } else if (!cloneSlot && t) {
-    cancelPushQueue(t.timerKey);
-  }
   if (cloneSlot) {
     if (timers[resId] && timers[resId].clones) {
       timers[resId].clones[cloneSlot] = null;
@@ -1445,7 +1154,7 @@ function checkTimers() {
       t.maxNotified = true;
       changed = true;
       if (t.variable) {
-        notify(r.name + ' 已停止刷新', islandTag + ' 已到最大刷新时间（' + formatTime(t.max) + '），物资已刷新！');
+        notify(r.name + ' 必定已刷新', islandTag + ' 已到最大刷新时间（' + formatTime(t.max) + '），物资已刷新！');
       } else {
         notify(r.name + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(t.max) + '）');
       }
@@ -1457,7 +1166,7 @@ function checkTimers() {
   for (const rid of Object.keys(timers)) {
     const t = timers[rid];
     if (!t.clones) continue;
-    for (const slot of [1,2,3,4,5,6,7,8,9,10]) {
+    for (const slot of [1,2,3]) {
       const c = t.clones[slot];
       if (!c || (c.minNotified === true && c.maxNotified === true)) continue;
       const elapsedReal = (now - c.startTime) / 1000;
@@ -1469,14 +1178,14 @@ function checkTimers() {
       const maxSec = Math.max(0, c.max * 60 - 2 * 60);
       if (c.variable && c.minNotified === false && elapsed >= minSec) {
         c.minNotified = true; changed = true;
-        notify(r.name + ' 分身' + slot + ' 刷新时间已到', islandTag + ' 至' + formatTime(c.max - c.min) + '【间隔时间】后可能刷新！');
+        notify(r.name + ' 分身' + slot + ' 可能已刷新', islandTag + ' 刷新范围下限将至（' + formatTime(c.min) + '）');
         if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
       }
       if (c.maxNotified === false && elapsed >= maxSec) {
         if (c.minNotified === false) c.minNotified = true;
         c.maxNotified = true; changed = true;
         if (c.variable) {
-          notify(r.name + ' 分身' + slot + ' 已停止刷新', islandTag + ' 已到最大刷新时间（' + formatTime(c.max) + '）');
+          notify(r.name + ' 分身' + slot + ' 必定已刷新', islandTag + ' 已到最大刷新时间（' + formatTime(c.max) + '）');
         } else {
           notify(r.name + ' 分身' + slot + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(c.max) + '）');
         }
@@ -1588,16 +1297,16 @@ function refreshCountdowns() {
     const elapsed = (Date.now() - state.startTime) / 1000 * mult;
     const ADV = 2;
     let nextCheckSec = Infinity;
-    if (state.minNotified === false && (state.variable || state.min !== state.max)) {
-      nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
+    if (state.minNotified === false && r.min !== r.max) {
+      nextCheckSec = Math.max(0, r.min * 60 - ADV * 60) - elapsed;
       if (nextCheckSec <= 0) nextCheckSec = 0;
     }
     if (state.maxNotified === false) {
-      const maxSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+      const maxSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
       if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
       if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
     }
-    if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+    if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, r.max * 60 - ADV * 60) - elapsed;
 
     const cdEl = card.querySelector('.countdown');
     if (cdEl) {
@@ -1605,12 +1314,7 @@ function refreshCountdowns() {
         cdEl.textContent = '已刷新';
         cdEl.className = 'countdown expired-text';
       } else {
-        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
-        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
-          cdEl.textContent = '已刷新 ' + t2 + '后结束';
-        } else {
-          cdEl.textContent = t2;
-        }
+        cdEl.textContent = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
         cdEl.className = 'countdown';
       }
     }
@@ -1618,7 +1322,7 @@ function refreshCountdowns() {
     // Update clone dots
     if (state.clones) {
       const dots = card.querySelectorAll('.clone-dot');
-      [1,2,3,4,5,6,7,8,9,10].forEach(slot => {
+      [1,2,3].forEach(slot => {
         const c = state.clones[slot];
         const active = c && (c.minNotified === false || c.maxNotified === false);
         if (dots[slot-1]) {
@@ -1626,38 +1330,6 @@ function refreshCountdowns() {
           else dots[slot-1].classList.remove('active');
         }
       });
-    }
-  });
-
-  // Update clone card countdowns
-  document.querySelectorAll('.card[data-cid]').forEach(card => {
-    const rid = parseInt(card.dataset.cid);
-    const slot = parseInt(card.dataset.slot);
-    const state = timers[rid];
-    if (!state || !state.clones || !state.clones[slot]) return;
-    const c = state.clones[slot];
-    if (!c.startTime) return;
-    const elapsed = (Date.now() - c.startTime) / 1000 * mult;
-    const ADV = 2;
-    let nextSec = Math.max(0, c.max * 60 - ADV * 60 - elapsed);
-    if (c.variable && c.minNotified === false) {
-      const minSec = Math.max(0, c.min * 60 - ADV * 60 - elapsed);
-      if (minSec > 0 && minSec < nextSec) nextSec = minSec;
-    }
-    const cdEl = card.querySelector('.countdown');
-    if (cdEl) {
-      if (nextSec <= 0) {
-        cdEl.textContent = '✅ 已刷新';
-        cdEl.className = 'countdown expired-text';
-      } else {
-        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
-        if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
-          cdEl.textContent = '已刷新 ' + t2 + '后结束';
-        } else {
-          cdEl.textContent = t2;
-        }
-        cdEl.className = 'countdown';
-      }
     }
   });
 }
@@ -1674,16 +1346,6 @@ function initApp() {
     window.matchMedia('(display-mode: standalone)').matches;
   if (isIOS && !isStandalone) {
     document.getElementById('iosGuide').classList.add('show');
-  }
-
-  // In-app browser guide (WeChat, QQ, etc.)
-  const ua = navigator.userAgent;
-  const isInApp = /MicroMessenger|QQ\//i.test(ua) && !isStandalone;
-  if (isInApp) {
-    const guide = document.getElementById('iosGuide');
-    guide.innerHTML = '<button class="close-guide" onclick="document.getElementById(\'iosGuide\').classList.remove(\'show\')">&times;</button>' +
-      '⚠️ <b>请用系统浏览器打开：</b><br>点右上角 <b>···</b> →「在浏览器中打开」→ 再添加到主屏幕';
-    guide.classList.add('show');
   }
 
   // Show notification permission banner on iOS if not granted
@@ -1712,97 +1374,26 @@ function initApp() {
 }
 
 let pushSubscription = null;
-let pushErrorMsg = '';
 
-async function subscribePush(reg, showToast = true) {
-  if (!('PushManager' in window)) {
-    pushErrorMsg = '浏览器不支持推送';
-    if (showToast) toast(pushErrorMsg);
-    return;
-  }
-
-  // Step 1: check notification permission
-  const curPerm = Notification.permission;
-  if (curPerm === 'denied') {
-    pushErrorMsg = '通知权限已被阻止，去浏览器设置→权限→开启通知';
-    if (showToast) toast(pushErrorMsg);
-    return;
-  }
-  if (curPerm !== 'granted') {
-    try {
+async function subscribePush(reg) {
+  if (!('PushManager' in window)) return;
+  try {
+    // Must have notification permission first
+    if (Notification.permission !== 'granted') {
       const p = await Notification.requestPermission();
-      if (p !== 'granted') {
-        pushErrorMsg = '未授权通知权限(' + p + ')';
-        if (showToast) toast(pushErrorMsg);
-        return;
-      }
-    } catch(e) {
-      pushErrorMsg = '请求权限失败: ' + e.message;
-      if (showToast) toast(pushErrorMsg);
-      return;
+      if (p !== 'granted') return;
     }
-  }
-
-  // Step 2: get SW registration
-  try {
-    if (!reg) reg = await navigator.serviceWorker.ready;
-  } catch(e) {
-    pushErrorMsg = 'SW未就绪: ' + e.message;
-    if (showToast) toast(pushErrorMsg);
-    return;
-  }
-
-  // Step 3: try subscribing
-  try {
     let sub = await reg.pushManager.getSubscription();
-    if (sub) {
-      pushSubscription = sub;
-      pushErrorMsg = '';
-      if (showToast) toast('推送已订阅');
-      return;
-    }
-
-    // Try with VAPID key first, then without
-    let err1 = null, err2 = null;
-    const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
-
-    // Attempt 1: with VAPID key
-    try {
+    if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: keyBytes,
+        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
       });
-    } catch(e) { err1 = e; }
-
-    if (sub) {
-      // Success with VAPID key
-      pushSubscription = sub;
-      pushErrorMsg = '';
-      document.getElementById('permBanner').classList.remove('show');
-      if (showToast) toast('推送订阅成功！');
-      return;
     }
-
-    // Attempt 2: without VAPID key
-    try {
-      sub = await reg.pushManager.subscribe({ userVisibleOnly: true });
-    } catch(e) { err2 = e; }
-
-    if (sub) {
-      // Keyless succeeded but VAPID failed - key is the problem
-      await sub.unsubscribe();
-      pushErrorMsg = 'VAPID密钥无效(' + (err1 ? err1.message : '') + ')';
-      if (showToast) toast('VAPID密钥问题，联系管理员');
-      return;
-    }
-
-    // Both failed
-    pushErrorMsg = '推送不可用：' + (err1 ? err1.message : '') + ' | ' + (err2 ? err2.message : '');
-    if (showToast) toast('推送订阅失败：' + pushErrorMsg);
-
+    pushSubscription = sub;
+    document.getElementById('permBanner').classList.remove('show');
   } catch(e) {
-    pushErrorMsg = '未知错误: ' + e.message;
-    if (showToast) toast(pushErrorMsg);
+    document.getElementById('permBanner').classList.add('show');
   }
 }
 
@@ -1810,13 +1401,7 @@ function urlB64ToUint8(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
-  const len = raw.length;
-  const buf = new ArrayBuffer(len);
-  const view = new Uint8Array(buf);
-  for (let i = 0; i < len; i++) {
-    view[i] = raw.charCodeAt(i);
-  }
-  return buf;
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
 }
 
 function arrayBufferToBase64Url(buffer) {
@@ -1828,7 +1413,7 @@ function arrayBufferToBase64Url(buffer) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-async function schedulePush(title, body, notifyAt, timerKey) {
+async function schedulePush(title, body, notifyAt) {
   if (!pushSubscription || !SUPABASE_URL) return;
   try {
     await fetch(SUPABASE_URL + '/rest/v1/push_queue', {
@@ -1846,46 +1431,38 @@ async function schedulePush(title, body, notifyAt, timerKey) {
         notify_at: new Date(notifyAt).toISOString(),
         title: title,
         body: body,
-        timer_key: timerKey || '',
       }),
     });
   } catch(e) { /* ignore */ }
 }
 
-async function cancelPushQueue(timerKey) {
-  if (!timerKey || !SUPABASE_URL) return;
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/push_queue?timer_key=eq.' + encodeURIComponent(timerKey), {
-      method: 'DELETE',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-      },
-    });
-  } catch(e) {}
-}
-
 async function init() {
-  try {
-    const valid = await checkActivation();
-    if (valid) {
-      document.getElementById('lockScreen').classList.add('hidden');
-      updateStatus();
-      initApp();
-    }
-  } catch(e) {
-    console.error('Init error:', e);
-    // Make sure lock screen stays visible and functional if init fails
+  const valid = await checkActivation();
+  if (valid) {
+    document.getElementById('lockScreen').classList.add('hidden');
+    updateStatus();
+    initApp();
   }
 }
 
 document.addEventListener('DOMContentLoaded', init);
 
-// For Android without push support: catch up when app comes back
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') setTimeout(checkTimers, 500);
-});
+// Wake lock to prevent phone from sleeping while page is open
+if ('wakeLock' in navigator) {
+  try {
+    navigator.wakeLock.request('screen').catch(() => {});
+  } catch(e) {}
+}
 
+// Catch up on missed notifications when app comes back to foreground
+let lastVisibleTime = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    lastVisibleTime = Date.now();
+    // Run check immediately to catch any missed timers
+    setTimeout(checkTimers, 500);
+  }
+});
 </script>
 
 </body>
