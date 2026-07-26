@@ -448,7 +448,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 </header>
 
 <div class="permission-banner" id="permBanner" onclick="requestNotificationPermission()">
-  📢 点击此处开启通知权限，刷新时提醒你
+  📢 点击开启通知，到时间提醒你
 </div>
 <div class="ios-guide" id="iosGuide">
   <button class="close-guide" onclick="document.getElementById('iosGuide').classList.remove('show')">&times;</button>
@@ -1756,7 +1756,7 @@ async function subscribePush(reg, showToast = true) {
   // Step 1: check notification permission
   const curPerm = Notification.permission;
   if (curPerm === 'denied') {
-    pushErrorMsg = '通知权限已被阻止，去浏览器设置→权限→开启通知';
+    pushErrorMsg = '通知已被阻止，去设置开启';
     if (showToast) toast(pushErrorMsg);
     return;
   }
@@ -1764,12 +1764,12 @@ async function subscribePush(reg, showToast = true) {
     try {
       const p = await Notification.requestPermission();
       if (p !== 'granted') {
-        pushErrorMsg = '未授权通知权限(' + p + ')';
+        pushErrorMsg = '未允许通知';
         if (showToast) toast(pushErrorMsg);
         return;
       }
     } catch(e) {
-      pushErrorMsg = '请求权限失败: ' + e.message;
+      pushErrorMsg = '权限请求失败';
       if (showToast) toast(pushErrorMsg);
       return;
     }
@@ -1779,7 +1779,7 @@ async function subscribePush(reg, showToast = true) {
   try {
     if (!reg) reg = await navigator.serviceWorker.ready;
   } catch(e) {
-    pushErrorMsg = 'SW未就绪: ' + e.message;
+    pushErrorMsg = 'SW未就绪';
     if (showToast) toast(pushErrorMsg);
     return;
   }
@@ -1823,17 +1823,17 @@ async function subscribePush(reg, showToast = true) {
     if (sub) {
       // Keyless succeeded but VAPID failed - key is the problem
       await sub.unsubscribe();
-      pushErrorMsg = 'VAPID密钥无效(' + (err1 ? err1.message : '') + ')';
-      if (showToast) toast('VAPID密钥问题，联系管理员');
+      pushErrorMsg = '密钥无效';
+      if (showToast) toast('密钥无效');
       return;
     }
 
     // Both failed
-    pushErrorMsg = '推送不可用：' + (err1 ? err1.message : '') + ' | ' + (err2 ? err2.message : '');
-    if (showToast) toast('推送订阅失败：' + pushErrorMsg);
+    pushErrorMsg = '推送不可用';
+    if (showToast) toast('推送订阅失败');
 
   } catch(e) {
-    pushErrorMsg = '未知错误: ' + e.message;
+    pushErrorMsg = '订阅失败';
     if (showToast) toast(pushErrorMsg);
   }
 }
