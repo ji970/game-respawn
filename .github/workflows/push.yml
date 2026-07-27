@@ -1,7 +1,9 @@
 name: Push Notification Daemon
 
 on:
-  workflow_dispatch:          # 仅手动触发
+  schedule:
+    - cron: '*/5 * * * *'  # 每5分钟（备份）
+  workflow_dispatch:
 
 jobs:
   push:
