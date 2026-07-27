@@ -26,15 +26,22 @@ async function main() {
           JSON.stringify({ title: p.title, body: p.body })
         );
         console.log('Sent: ' + p.title);
+        await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sent: true })
+        });
       } catch(e) {
         console.error('Push failed: ' + (e.statusCode || e.message));
+        // 永久失效才标记，临时错误保留重试
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
+            method: 'PATCH',
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sent: true })
+          });
+        }
       }
-      // Always mark as sent to avoid retry loops
-      await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sent: true })
-      });
     }
   } catch(e) {
     console.error('FATAL: ' + e.message);
