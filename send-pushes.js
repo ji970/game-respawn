@@ -1,13 +1,12 @@
 const webpush = require('web-push');
 
-webpush.setVapidDetails(
-  'https://ji970.github.io/game-respawn/',
-  'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw',
-  'EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI'
-);
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'https://ji970.github.io/game-respawn/';
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI';
+const SUPABASE_URL  = process.env.SUPABASE_URL  || 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
+const SUPABASE_KEY  = process.env.SUPABASE_KEY  || 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 
-const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
+webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
 async function main() {
   try {
@@ -15,12 +14,10 @@ async function main() {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
     const pushes = await r.json();
-    console.log('Found ' + (Array.isArray(pushes)?pushes.length:'error') + ' pending');
-    if (!Array.isArray(pushes) || pushes.length === 0) return;
+    if (!Array.isArray(pushes)) return;
 
-    const now = Date.now();
-    const due = pushes.filter(p => new Date(p.notify_at).getTime() <= now);
-    console.log('Due: ' + due.length);
+    const due = pushes.filter(p => new Date(p.notify_at).getTime() <= Date.now());
+    console.log(`Checked ${pushes.length} pending, ${due.length} due`);
 
     for (const p of due) {
       try {
@@ -28,24 +25,20 @@ async function main() {
           { endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } },
           JSON.stringify({ title: p.title, body: p.body })
         );
-        await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
-          method: 'PATCH',
-          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sent: true })
-        });
+        console.log('Sent: ' + p.title);
       } catch(e) {
-        if (e.statusCode === 410 || e.statusCode === 404) {
-          await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
-            method: 'PATCH',
-            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sent: true })
-          });
-        }
+        console.error('Push failed: ' + (e.statusCode || e.message));
       }
+      // Always mark as sent to avoid retry loops
+      await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sent: true })
+      });
     }
   } catch(e) {
     console.error('FATAL: ' + e.message);
-    throw e;
+    process.exit(1);
   }
 }
 
