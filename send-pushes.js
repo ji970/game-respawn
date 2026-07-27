@@ -16,6 +16,20 @@ async function main() {
     const pushes = await r.json();
     if (!Array.isArray(pushes)) return;
 
+    // Cleanup: mark pushes older than 1 hour as expired
+    const hourAgo = new Date(Date.now() - 3600000).toISOString();
+    const expired = pushes.filter(p => p.notify_at < hourAgo);
+    if (expired.length) {
+      for (const p of expired) {
+        await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + p.id, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sent: true })
+        });
+      }
+      console.log('Expired: ' + expired.length);
+    }
+
     const due = pushes.filter(p => new Date(p.notify_at).getTime() <= Date.now());
     console.log(`Checked ${pushes.length} pending, ${due.length} due`);
 
