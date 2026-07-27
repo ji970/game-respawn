@@ -793,6 +793,7 @@ function requestNotificationPermission() {
 }
 
 function notify(title, body) {
+  if (document.visibilityState === 'hidden') return; // 后台不发前台通知，避免和推送重复
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') {
     try {
