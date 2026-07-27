@@ -10,7 +10,7 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
 async function main() {
   try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&limit=50', {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/push_queue?sent=eq.false&order=notify_at.asc&limit=50', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
     const pushes = await r.json();
