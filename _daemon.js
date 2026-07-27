@@ -1,6 +1,10 @@
 // Daemon startup — kill existing daemon first to prevent duplicates
 var http = require('http');
 
+// Prevent crashes from killing the daemon
+process.on('uncaughtException', function(e) { console.error('Uncaught:', e.message); });
+process.on('unhandledRejection', function(e) { console.error('Rejection:', e && e.message); });
+
 // Single-instance lock via a local server
 var LOCK_PORT = 19999;
 var server = http.createServer(function(req, res) { res.end('ok'); });
