@@ -471,7 +471,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
-const VAPID_PUBLIC = 'BAmk_9L3ZXnD5yyGEx1QlCobC_clU4e2VX9HatJ3NNC_7gWDzuXjyF4wMsn9DxI8_3nLrLF9n9vYQdMc9Wc5zs4';
+const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
   const ua = navigator.userAgent;
@@ -1879,7 +1879,7 @@ async function schedulePush(title, body, notifyAt, timerKey) {
         timer_key: timerKey || '',
       }),
     });
-  } catch(e) { /* ignore */ }
+  } catch(e) { toast('推送注册失败: ' + (e.message || '网络错误')); }
 }
 
 async function cancelPushQueue(timerKey) {
