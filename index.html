@@ -1789,10 +1789,7 @@ async function subscribePush(reg, showToast = true) {
   try {
     let sub = await reg.pushManager.getSubscription();
     if (sub) {
-      pushSubscription = sub;
-      pushErrorMsg = '';
-      if (showToast) toast('推送已订阅');
-      return;
+      await sub.unsubscribe();
     }
 
     // Try with VAPID key first, then without
