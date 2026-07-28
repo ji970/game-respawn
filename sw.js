@@ -1,4 +1,4 @@
-const CACHE_NAME = 'respawn-v2';
+const CACHE_NAME = 'respawn-v3';
 const ASSETS = [
   '/',
   '/index.html',
@@ -45,7 +45,6 @@ self.addEventListener('push', e => {
     vibrate: [200, 100, 200, 100, 200],
     tag: 'respawn-notify',
     renotify: true,
-    requireInteraction: true,
     silent: false,
     actions: [{ action: 'open', title: '查看' }],
   };
