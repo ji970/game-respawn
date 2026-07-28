@@ -1,8 +1,8 @@
 const webpush = require('web-push');
 
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'https://ji970.github.io/game-respawn/';
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI';
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BAmk_9L3ZXnD5yyGEx1QlCobC_clU4e2VX9HatJ3NNC_7gWDzuXjyF4wMsn9DxI8_3nLrLF9n9vYQdMc9Wc5zs4';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'jJsNL_LQG4FCMS7eBW0vRceqB8CeJMSePSWLfZiV7Eg';
 const SUPABASE_URL  = process.env.SUPABASE_URL  || 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
 const SUPABASE_KEY  = process.env.SUPABASE_KEY  || 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 

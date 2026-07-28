@@ -21,8 +21,8 @@ setInterval(async function() {
     var w = require('web-push');
     w.setVapidDetails(
       'https://ji970.github.io/game-respawn/',
-      'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw',
-      'EX11Sl4dbvV4nQRG1hD28tp0RkLAWTPy2jczd_cFCHI'
+      'BAmk_9L3ZXnD5yyGEx1QlCobC_clU4e2VX9HatJ3NNC_7gWDzuXjyF4wMsn9DxI8_3nLrLF9n9vYQdMc9Wc5zs4',
+      'jJsNL_LQG4FCMS7eBW0vRceqB8CeJMSePSWLfZiV7Eg'
     );
     var SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
     var SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
@@ -31,7 +31,7 @@ setInterval(async function() {
       { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }
     );
     var p = await r.json();
-    if (!Array.isArray(p)) return;
+    if (!Array.isArray(p)) { console.error('Supabase returned non-array:', typeof p); return; }
 
     // Cleanup pushes older than 1 hour as expired
     var hourAgo = new Date(Date.now() - 3600000).toISOString();
@@ -48,19 +48,26 @@ setInterval(async function() {
     var due = p.filter(function(x) {
       return !x.notify_at || x.notify_at >= hourAgo && new Date(x.notify_at).getTime() <= Date.now();
     });
+    console.log(new Date().toISOString() + ' pending=' + p.length + ' due=' + due.length);
+
     for (var j = 0; j < due.length; j++) {
       var x = due[j];
       try {
-        await w.sendNotification(
+        var result = await w.sendNotification(
           { endpoint: x.endpoint, keys: { p256dh: x.p256dh, auth: x.auth } },
           JSON.stringify({ title: x.title, body: x.body })
         );
+        console.log(new Date().toISOString() + ' OK ' + x.title + ' (' + result.statusCode + ')');
         await fetch(SUPABASE_URL + '/rest/v1/push_queue?id=eq.' + x.id, {
           method: 'PATCH',
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
           body: JSON.stringify({ sent: true })
         });
-      } catch(e) {}
+      } catch(e) {
+        console.error(new Date().toISOString() + ' FAIL ' + x.title + ': ' + (e.statusCode || e.message));
+      }
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error(new Date().toISOString() + ' LOOP ERROR: ' + (e && e.message));
+  }
 }, 30000);
