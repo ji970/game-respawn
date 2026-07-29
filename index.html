@@ -762,7 +762,7 @@ const categories = [
 const STORAGE_KEY = 'respawn_timers';
 const islandSelections = {}; // per-resource island selection (UI only, defaults to 1)
 const MIN_CHECK_INTERVAL = 2000; // 2秒检查一次
-let testMode = false; // 测试模式：1分钟=1秒
+let testMode = localStorage.getItem('testMode') === '1'; // 测试模式：1分钟=1秒
 let currentCat = 'crop';
 
 function loadTimers() {
@@ -1591,6 +1591,7 @@ function checkDailyTimers(rid, t) {
 // ====== 测试模式 ======
 function toggleTestMode() {
   testMode = !testMode;
+  localStorage.setItem('testMode', testMode ? '1' : '0');
   document.getElementById('testLabel').textContent = testMode ? '开' : '关';
   if (testMode) {
     toast('测试模式：1分钟=1秒（倒计时会很快）');
@@ -1810,6 +1811,7 @@ async function subscribePush(reg, showToast = true) {
       pushErrorMsg = '';
       document.getElementById('permBanner').classList.remove('show');
       if (showToast) toast('推送订阅成功！');
+      rescheduleActiveTimers();
       return;
     }
 
@@ -1894,6 +1896,50 @@ async function cancelPushQueue(timerKey) {
       },
     });
   } catch(e) {}
+}
+
+async function rescheduleActiveTimers() {
+  if (!pushSubscription || !SUPABASE_URL) return;
+  var timers = loadTimers();
+  var msPerMin = testMode ? 1000 : 60000;
+  var now = Date.now();
+  for (var rid in timers) {
+    var t = timers[rid];
+    if (!t.startTime) continue;
+    var r = resources.find(function(x) { return String(x.id) === rid; });
+    if (!r) continue;
+    // Cancel old push entries for this timer
+    if (t.timerKey) await cancelPushQueue(t.timerKey);
+    // Calculate remaining time
+    var elapsed = now - t.startTime;
+    var remainMin = Math.max(0, t.min * msPerMin - elapsed);
+    var remainMax = Math.max(0, t.max * msPerMin - elapsed);
+    if (t.daily || t.max === 0) continue; // skip daily, already handled by checkDailyTimers
+    if (t.variable) {
+      if (remainMin > 0) schedulePush(r.name + ' 刷新时间已到', '', now + remainMin, t.timerKey);
+      if (remainMax > 0) schedulePush(r.name + ' 已停止刷新', '', now + remainMax, t.timerKey);
+    } else {
+      if (remainMax > 0) schedulePush(r.name + ' 物资已刷新', '', now + remainMax, t.timerKey);
+    }
+    // Handle clones
+    if (t.clones) {
+      for (var slot in t.clones) {
+        var c = t.clones[slot];
+        if (!c.startTime) continue;
+        var cKey = (t.timerKey || '') + '_c' + slot;
+        await cancelPushQueue(cKey);
+        var cElapsed = now - c.startTime;
+        var cRemainMin = Math.max(0, c.min * msPerMin - cElapsed);
+        var cRemainMax = Math.max(0, c.max * msPerMin - cElapsed);
+        if (c.variable) {
+          if (cRemainMin > 0) schedulePush(r.name + ' 分身' + slot + ' 刷新时间已到', '', now + cRemainMin, cKey);
+          if (cRemainMax > 0) schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '', now + cRemainMax, cKey);
+        } else {
+          if (cRemainMax > 0) schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '', now + cRemainMax, cKey);
+        }
+      }
+    }
+  }
 }
 
 async function init() {
