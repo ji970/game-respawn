@@ -461,7 +461,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 
 <div class="toolbar">
   <button onclick="resetAll()">重置全部计时</button>
-  <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
+  <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button> <span id="pushStatus" style="font-size:12px;color:#888">推送检测中...</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1787,49 +1787,64 @@ async function subscribePush(reg, showToast = true) {
     return;
   }
 
-  // Step 3: get or create subscription
+  // Step 3: try subscribing
   try {
     let sub = await reg.pushManager.getSubscription();
-    var needNew = !sub;
     if (sub) {
-      // Reuse existing unless older than 12h (iOS expires ~18-24h)
-      var lastSub = parseInt(localStorage.getItem('_sub_ts') || '0');
-      if (Date.now() - lastSub > 43200000) {
-        await sub.unsubscribe();
-        needNew = true;
-      }
+      await sub.unsubscribe();
     }
-    if (needNew) {
-      var err1 = null;
-      var keyBytes = urlB64ToUint8(VAPID_PUBLIC);
-      try {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: keyBytes,
-        });
-      } catch(e) { err1 = e; }
-      if (sub) { localStorage.setItem('_sub_ts', Date.now().toString()); }
-      else {
-        // VAPID failed, try without
-        try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true }); } catch(e) {}
-        if (sub) { await sub.unsubscribe(); }
-      }
-    }
+
+    var err1 = null;
+    var keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyBytes,
+      });
+    } catch(e) { err1 = e; }
 
     if (sub) {
       pushSubscription = sub;
       pushErrorMsg = '';
       document.getElementById('permBanner').classList.remove('show');
-      if (showToast) toast(needNew ? '推送订阅已刷新' : '推送已就绪');
-      if (needNew) rescheduleActiveTimers();
+      if (showToast) toast('推送订阅成功！');
+      rescheduleActiveTimers();
       var q = pendingPushQueue; pendingPushQueue = [];
       q.forEach(function(a) { schedulePush(a[0], a[1], a[2], a[3]); });
+      updatePushStatus();
       return;
     }
+
+    // VAPID failed, try without
+    try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true }); } catch(e) {}
+    if (sub) {
+      await sub.unsubscribe();
+      pushErrorMsg = '密钥无效';
+      if (showToast) toast('密钥无效');
+      updatePushStatus();
+      return;
+    }
+
+    pushErrorMsg = '推送不可用';
+    if (showToast) toast('推送订阅失败');
+    updatePushStatus();
 
   } catch(e) {
     pushErrorMsg = '订阅失败';
     if (showToast) toast(pushErrorMsg);
+    updatePushStatus();
+  }
+}
+
+function updatePushStatus() {
+  var el = document.getElementById('pushStatus');
+  if (!el) return;
+  if (pushSubscription) {
+    el.textContent = '✓ 推送已就绪';
+    el.style.color = '#4caf50';
+  } else {
+    el.textContent = '✗ 推送未就绪';
+    el.style.color = '#f44336';
   }
 }
 
