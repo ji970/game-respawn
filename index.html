@@ -1787,54 +1787,45 @@ async function subscribePush(reg, showToast = true) {
     return;
   }
 
-  // Step 3: try subscribing
+  // Step 3: get or create subscription
   try {
     let sub = await reg.pushManager.getSubscription();
+    var needNew = !sub;
     if (sub) {
-      await sub.unsubscribe();
+      // Reuse existing unless older than 12h (iOS expires ~18-24h)
+      var lastSub = parseInt(localStorage.getItem('_sub_ts') || '0');
+      if (Date.now() - lastSub > 43200000) {
+        await sub.unsubscribe();
+        needNew = true;
+      }
+    }
+    if (needNew) {
+      var err1 = null;
+      var keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: keyBytes,
+        });
+      } catch(e) { err1 = e; }
+      if (sub) { localStorage.setItem('_sub_ts', Date.now().toString()); }
+      else {
+        // VAPID failed, try without
+        try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true }); } catch(e) {}
+        if (sub) { await sub.unsubscribe(); }
+      }
     }
 
-    // Try with VAPID key first, then without
-    let err1 = null, err2 = null;
-    const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
-
-    // Attempt 1: with VAPID key
-    try {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: keyBytes,
-      });
-    } catch(e) { err1 = e; }
-
     if (sub) {
-      // Success with VAPID key
       pushSubscription = sub;
       pushErrorMsg = '';
       document.getElementById('permBanner').classList.remove('show');
-      if (showToast) toast('推送订阅成功！');
-      rescheduleActiveTimers();
-      // Flush any pending pushes that were queued before subscription was ready
+      if (showToast) toast(needNew ? '推送订阅已刷新' : '推送已就绪');
+      if (needNew) rescheduleActiveTimers();
       var q = pendingPushQueue; pendingPushQueue = [];
       q.forEach(function(a) { schedulePush(a[0], a[1], a[2], a[3]); });
       return;
     }
-
-    // Attempt 2: without VAPID key
-    try {
-      sub = await reg.pushManager.subscribe({ userVisibleOnly: true });
-    } catch(e) { err2 = e; }
-
-    if (sub) {
-      // Keyless succeeded but VAPID failed - key is the problem
-      await sub.unsubscribe();
-      pushErrorMsg = '密钥无效';
-      if (showToast) toast('密钥无效');
-      return;
-    }
-
-    // Both failed
-    pushErrorMsg = '推送不可用';
-    if (showToast) toast('推送订阅失败');
 
   } catch(e) {
     pushErrorMsg = '订阅失败';
