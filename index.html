@@ -591,26 +591,10 @@ async function activate() {
       const existing = await checkRes.json();
 
       if (existing.length > 0) {
-        // Compare only hardware parts (first 3) to support cross-browser + migration from UUID format
-        const oldHw = existing[0].device.split('|').slice(0, 3).join('|');
-        const newHw = device.split('|').slice(0, 3).join('|');
-        if (oldHw !== newHw) {
+        if (existing[0].device !== device) {
           errEl.textContent = '此激活码已在其他设备使用';
           btn.disabled = false; btn.textContent = '激活';
           return;
-        }
-        // If fingerprint format changed (e.g. UUID added/removed), update to current
-        if (existing[0].device !== device) {
-          await fetch(SUPABASE_URL + '/rest/v1/activations?id=eq.' + existing[0].id, {
-            method: 'PATCH',
-            headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': 'Bearer ' + SUPABASE_KEY,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=minimal',
-            },
-            body: JSON.stringify({ device: device }),
-          });
         }
       }
 
