@@ -474,13 +474,13 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
-  const ua = navigator.userAgent;
-  const platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
-  return [
-    screen.width + 'x' + screen.height,
-    platform,
-    navigator.hardwareConcurrency || '0',
-  ].join('|');
+  var stored = localStorage.getItem('__did');
+  if (stored) return stored;
+  var ua = navigator.userAgent;
+  var platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
+  var did = platform + '_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('__did', did);
+  return did;
 }
 
 async function hmacHex(message, secret) {
@@ -513,7 +513,16 @@ async function checkActivation() {
   if (act.sig !== expectedSig) return false;
 
   // Check device binding (local fingerprint)
-  if (act.device && act.device !== getDeviceId()) return false;
+  var curDev = getDeviceId();
+  if (act.device && act.device !== curDev) {
+    // One-time migration from old screen-format to local UUID
+    if (act.device.indexOf('x') !== -1 && act.device.indexOf('|') !== -1) {
+      act.device = curDev;
+      localStorage.setItem('activation', JSON.stringify(act));
+    } else {
+      return false;
+    }
+  }
 
   // Check expiry
   if (act.expiryHex === 'ffffffff') return true; // permanent
