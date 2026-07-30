@@ -1864,11 +1864,22 @@ function arrayBufferToBase64Url(buffer) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+function waitForSubscription(timeout) {
+  timeout = timeout || 10000;
+  var start = Date.now();
+  return new Promise(function(resolve) {
+    function check() {
+      if (pushSubscription) return resolve();
+      if (Date.now() - start > timeout) return resolve();
+      setTimeout(check, 200);
+    }
+    check();
+  });
+}
+
 async function schedulePush(title, body, notifyAt, timerKey) {
-  if (!pushSubscription) {
-    pendingPushQueue.push([title, body, notifyAt, timerKey]);
-    return;
-  }
+  if (!pushSubscription) await waitForSubscription();
+  if (!pushSubscription) return; // timed out, still not ready
   if (!SUPABASE_URL) return;
   try {
     await fetch(SUPABASE_URL + '/rest/v1/push_queue', {
