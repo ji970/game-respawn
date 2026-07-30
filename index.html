@@ -1747,6 +1747,7 @@ function initApp() {
 
 let pushSubscription = null;
 let pushErrorMsg = '';
+let pendingPushQueue = [];
 
 async function subscribePush(reg, showToast = true) {
   if (!('PushManager' in window)) {
@@ -1812,6 +1813,9 @@ async function subscribePush(reg, showToast = true) {
       document.getElementById('permBanner').classList.remove('show');
       if (showToast) toast('推送订阅成功！');
       rescheduleActiveTimers();
+      // Flush any pending pushes that were queued before subscription was ready
+      var q = pendingPushQueue; pendingPushQueue = [];
+      q.forEach(function(a) { schedulePush(a[0], a[1], a[2], a[3]); });
       return;
     }
 
@@ -1861,7 +1865,10 @@ function arrayBufferToBase64Url(buffer) {
 }
 
 async function schedulePush(title, body, notifyAt, timerKey) {
-  if (!pushSubscription) { toast('推送未就绪，请刷新页面'); return; }
+  if (!pushSubscription) {
+    pendingPushQueue.push([title, body, notifyAt, timerKey]);
+    return;
+  }
   if (!SUPABASE_URL) return;
   try {
     await fetch(SUPABASE_URL + '/rest/v1/push_queue', {
