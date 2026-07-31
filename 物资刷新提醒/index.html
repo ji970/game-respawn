@@ -518,6 +518,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 <script>
 // ====== 版本号（修改此处强制旧版更新） ======
 const APP_VERSION = 1;
+const __sig = 'v2h7k9'; // 自校验签名，和服务器 version.json 比对
 
 // ====== 激活码验证 ======
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
@@ -557,9 +558,15 @@ function getActivation() {
   catch(e) { return null; }
 }
 
-async function checkActivation() {
+var __v = 0; // anti-tamper flag: set by preloadAssets, checked elsewhere
+function __iv() { if (!__v) { document.body.innerHTML = '<div style=\"color:#fff;text-align:center;padding:40px;font-size:16px\">应用已损坏，请重新下载</div>'; throw new Error(); } }
+(function() {
+  var d = parseInt(localStorage.getItem('_it') || '0');
+  if (!d) { localStorage.setItem('_it', Date.now().toString()); }
+})();
+async function preloadAssets() {
   const act = getActivation();
-  if (!act || !act.expiryHex || !act.sig) return false;
+  if (!act || !act.expiryHex || !act.sig) { __v = 0; return false; }
 
   // Verify signature (supports both old 8+8 and new 8+4+4 formats)
   let expectedSig;
@@ -583,10 +590,43 @@ async function checkActivation() {
   }
 
   // Check expiry
-  if (act.expiryHex === 'ffffffff') return true; // permanent
+  if (act.expiryHex === 'ffffffff') { __v = 1; return true; } // permanent
   const expiry = parseInt(act.expiryHex, 16) * 1000;
   if (Date.now() > expiry) return false;
 
+  // Server-side validation (every 24h, with 7-day offline grace)
+  // 72h bomb: first install check is mandatory
+  var installTime = parseInt(localStorage.getItem('_it') || '0');
+  var mustCheck = installTime && (Date.now() - installTime > 259200000); // 72h
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    var lastCheck = parseInt(localStorage.getItem('_ac_last') || '0');
+    if (mustCheck || Date.now() - lastCheck > 86400000) {
+      try {
+        var codeHash = act.code_hash;
+        if (!codeHash) { if (!mustCheck) { localStorage.setItem('_ac_last', Date.now().toString()); return true; } } // 旧激活跳过，除非强制
+        var sRes = await fetch(SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash + '&select=device', {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        if (sRes.ok) {
+          var sData = await sRes.json();
+          if (Array.isArray(sData) && sData.length > 0) {
+            if (sData[0].device !== curDevice && !(sData[0].device.indexOf('x') !== -1 && sData[0].device.indexOf('|') !== -1)) {
+              localStorage.removeItem('activation');
+              return false;
+            }
+          }
+          localStorage.setItem('_ac_last', Date.now().toString());
+        } else if (mustCheck) {
+          return false; // 72h bomb: server must respond
+        }
+      } catch(e) {
+        if (mustCheck) return false; // 72h bomb: no network, lock
+        if (Date.now() - lastCheck > 604800000) return false;
+      }
+    }
+  }
+
+  __v = 1;
   return true;
 }
 
@@ -707,6 +747,7 @@ async function activate() {
     sig: sig,
     activatedAt: Date.now(),
     device: device,
+    code_hash: codeHash,
   };
   if (nonce !== undefined) actData.nonce = nonce;
   localStorage.setItem('activation', JSON.stringify(actData));
@@ -1295,6 +1336,7 @@ function renderNav() {
 
 var _lastRender = 0;
 function renderCards(immediate) {
+  if ((Date.now() / 60000 | 0) % 5 === 0) __iv(); // integrity spot-check
   if (!immediate) {
     var now = Date.now();
     if (now - _lastRender < 150) return;
@@ -1683,6 +1725,7 @@ function onCardClick(resId) {
 }
 
 function startTimer(r, customMin, customMax) {
+  __iv();
   const timers = loadTimers();
   const now = Date.now();
   const island = islandSelections[r.id] || 1;
@@ -2012,6 +2055,7 @@ function startCountdownLoop() {
 }
 
 function refreshCountdowns() {
+  if ((Date.now() / 30000 | 0) % 3 === 0) __iv(); // integrity spot-check
   const timers = loadTimers();
   const mult = testMode ? 60 : 1;
   const cards = document.querySelectorAll('.card.running');
@@ -2484,11 +2528,18 @@ async function init() {
         document.getElementById('lockScreen').innerHTML = '<div class=\"lock-box\"><h2>版本过旧</h2><div class=\"lock-sub\">请下载最新版本</div><a href=\"' + (vData.download_url || '#') + '\" class=\"btn-guide-done\" style=\"display:block;text-decoration:none;margin-top:16px\">去更新</a></div>';
         return;
       }
+      // Self-integrity: if server knows a different signature, code was tampered
+      if (vData.app_sig && typeof __sig !== 'undefined' && __sig !== vData.app_sig) {
+        // Silently lock: code has been modified
+        document.getElementById('lockScreen').classList.remove('hidden');
+        document.getElementById('lockScreen').innerHTML = '<div class=\"lock-box\"><h2>应用已损坏</h2><div class=\"lock-sub\">请重新下载安装</div><a href=\"' + (vData.download_url || '#') + '\" class=\"btn-guide-done\" style=\"display:block;text-decoration:none;margin-top:16px\">重新下载</a></div>';
+        return;
+      }
     }
   } catch(e) {}
 
   try {
-    const valid = await checkActivation();
+    const valid = await preloadAssets();
     if (valid) {
       document.getElementById('lockScreen').classList.add('hidden');
       updateStatus();
