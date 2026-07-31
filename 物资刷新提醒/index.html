@@ -2520,6 +2520,8 @@ async function init() {
   } catch(e) {}
 
   try {
+    var dbg = localStorage.getItem('_dbg');
+    if (dbg) { document.getElementById('lockError').textContent = 'ERR:' + dbg; }
     const valid = await preloadAssets();
     if (valid) {
       document.getElementById('lockScreen').classList.add('hidden');
