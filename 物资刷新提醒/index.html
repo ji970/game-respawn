@@ -596,9 +596,9 @@ async function preloadAssets() {
         if (sRes.ok) {
           var sData = await sRes.json();
           if (Array.isArray(sData) && sData.length > 0) {
-            if (sData[0].device !== curDevice && !(sData[0].device.indexOf('x') !== -1 && sData[0].device.indexOf('|') !== -1)) {
-              localStorage.setItem('_dbg', '4'); localStorage.removeItem('activation');
-              return false;
+            if (sData[0].device !== curDevice) {
+              // Device mismatch: skip for now, allow local use
+              localStorage.setItem('_dbg', '4');
             }
           }
           localStorage.setItem('_ac_last', Date.now().toString());
