@@ -556,7 +556,7 @@ function __iv() { if (!__v) { document.body.innerHTML = '<div style=\"color:#fff
 })();
 async function preloadAssets() {
   const act = getActivation();
-  if (!act || !act.expiryHex || !act.sig) { __v = 0; return false; }
+  if (!act || !act.expiryHex || !act.sig) { __v = 0; localStorage.setItem('_dbg', '1'); return false; }
 
   // Verify signature (supports both old 8+8 and new 8+4+4 formats)
   let expectedSig;
@@ -565,7 +565,7 @@ async function preloadAssets() {
   } else {
     expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
   }
-  if (act.sig !== expectedSig) return false;
+  if (act.sig !== expectedSig) { localStorage.setItem('_dbg', '2'); return false; }
 
   // Check device binding (local fingerprint)
   var curDevice = getDeviceId();
@@ -578,7 +578,7 @@ async function preloadAssets() {
   // Check expiry
   if (act.expiryHex === 'ffffffff') { __v = 1; return true; } // permanent
   const expiry = parseInt(act.expiryHex, 16) * 1000;
-  if (Date.now() > expiry) return false;
+  if (Date.now() > expiry) { localStorage.setItem('_dbg', '3'); return false; }
 
   // Server-side validation (every 24h, with 7-day offline grace)
   // 72h bomb: first install check is mandatory
@@ -597,17 +597,17 @@ async function preloadAssets() {
           var sData = await sRes.json();
           if (Array.isArray(sData) && sData.length > 0) {
             if (sData[0].device !== curDevice && !(sData[0].device.indexOf('x') !== -1 && sData[0].device.indexOf('|') !== -1)) {
-              localStorage.removeItem('activation');
+              localStorage.setItem('_dbg', '4'); localStorage.removeItem('activation');
               return false;
             }
           }
           localStorage.setItem('_ac_last', Date.now().toString());
         } else if (mustCheck) {
-          return false; // 72h bomb: server must respond
+          localStorage.setItem('_dbg', '5'); return false;
         }
       } catch(e) {
-        if (mustCheck) return false; // 72h bomb: no network, lock
-        if (Date.now() - lastCheck > 604800000) return false;
+        if (mustCheck) { localStorage.setItem('_dbg', '6'); return false; }
+        if (Date.now() - lastCheck > 604800000) { localStorage.setItem('_dbg', '7'); return false; }
       }
     }
   }
