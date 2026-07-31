@@ -520,29 +520,6 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 const APP_VERSION = 1;
 const __sig = 'v2h7k9'; // 自校验签名，和服务器 version.json 比对
 
-// Survive app kill on Android: mirror critical keys to plus.storage
-(function() {
-  if (typeof plus === 'undefined' || !plus.storage) return;
-  var _ls = window.localStorage;
-  window.localStorage = {
-    getItem: function(k) {
-      try { var v = plus.storage.getItem(k); if (v) return v; } catch(e) {}
-      return _ls.getItem(k);
-    },
-    setItem: function(k, v) {
-      if (k === 'activation' || k === '__did') { try { plus.storage.setItem(k, String(v)); } catch(e) {} }
-      try { _ls.setItem(k, String(v)); } catch(e) {}
-    },
-    removeItem: function(k) {
-      try { plus.storage.removeItem(k); } catch(e) {}
-      try { _ls.removeItem(k); } catch(e) {}
-    },
-    get length() { return _ls.length; },
-    key: function(i) { return _ls.key(i); },
-    clear: function() { try { _ls.clear(); } catch(e) {} }
-  };
-})();
-
 // ====== 激活码验证 ======
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
@@ -550,23 +527,9 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
-  // Native APK: use stable system UUID (survives app kill, reinstall changes it)
-  try {
-    if (typeof plus !== 'undefined' && plus.device) {
-      var nativeId = plus.device.uuid || plus.device.imei;
-      if (nativeId) {
-        var phys = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
-        return nativeId + '|' + phys;
-      }
-    }
-  } catch(e) {}
-  // Web fallback: localStorage UUID
-  var stored = localStorage.getItem('__did');
-  if (stored) return stored;
-  var phys2 = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
-  var did = Math.random().toString(36).slice(2) + Date.now().toString(36) + '|' + phys2;
-  localStorage.setItem('__did', did);
-  return did;
+  var ua = navigator.userAgent;
+  var platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
+  return screen.width + 'x' + screen.height + '|' + platform + '|' + (navigator.hardwareConcurrency || '0');
 }
 
 async function hmacHex(message, secret) {
