@@ -600,8 +600,8 @@ async function activate() {
           // Also check old screen-format
           var oldStyle = oldDev.split('|').slice(0, 3).join('|');
           var isOldFmt = oldDev.indexOf('x') !== -1 && oldDev.indexOf('|') !== -1;
-          if (oldPhys === newPhys || (isOldFmt && oldStyle === phys)) {
-            // Same physical device — skip server write, RLS blocks PATCH/DELETE
+          if (oldPhys === newPhys || (isOldFmt && oldStyle === phys) || oldDev.indexOf('|') === -1) {
+            // Same physical device or UUID-only old record — skip server write
           } else {
             errEl.textContent = '此激活码已在其他设备使用';
             btn.disabled = false; btn.textContent = '激活';

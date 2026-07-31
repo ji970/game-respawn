@@ -692,20 +692,14 @@ async function activate() {
       if (existing.length > 0) {
         var oldDev = existing[0].device;
         if (oldDev !== device) {
-          var isOldFormat = oldDev.indexOf('x') !== -1 && oldDev.indexOf('|') !== -1;
-          if (isOldFormat) {
-            var oldStyle = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
-            if (oldDev.split('|').slice(0,3).join('|') === oldStyle) {
-              await fetch(SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash, {
-                method: 'DELETE',
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
-              });
-              existing = [];
-            } else {
-              errEl.textContent = '此激活码已在其他设备使用';
-              btn.disabled = false; btn.textContent = '激活';
-              return;
-            }
+          // Check physical fingerprint (survives reinstall, cross-browser on same device)
+          var phys = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
+          var oldPhys = oldDev.split('|').slice(-3).join('|');
+          var newPhys = device.split('|').slice(-3).join('|');
+          var oldStyle = oldDev.split('|').slice(0, 3).join('|');
+          var isOldFmt = oldDev.indexOf('x') !== -1 && oldDev.indexOf('|') !== -1;
+          if (oldPhys === newPhys || (isOldFmt && oldStyle === phys) || oldDev.indexOf('|') === -1) {
+            // Same physical device or UUID-only old record — skip server write
           } else {
             errEl.textContent = '此激活码已在其他设备使用';
             btn.disabled = false; btn.textContent = '激活';
@@ -751,6 +745,7 @@ async function activate() {
   };
   if (nonce !== undefined) actData.nonce = nonce;
   localStorage.setItem('activation', JSON.stringify(actData));
+  __v = 1; // anti-tamper: mark as legitimately activated
 
   document.getElementById('lockScreen').classList.add('hidden');
   updateStatus();
