@@ -680,11 +680,9 @@ async function activate() {
         if (oldDev !== device) {
           // Check physical fingerprint (survives reinstall, cross-browser on same device)
           var phys = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
-          var oldPhys = oldDev.split('|').slice(-3).join('|');
-          var newPhys = device.split('|').slice(-3).join('|');
-          var oldStyle = oldDev.split('|').slice(0, 3).join('|');
-          var isOldFmt = oldDev.indexOf('x') !== -1 && oldDev.indexOf('|') !== -1;
-          if (oldPhys === newPhys || (isOldFmt && oldStyle === phys) || oldDev.indexOf('|') === -1) {
+          var parts = phys.split('|');
+          var match = parts.every(function(p) { return oldDev.indexOf(p) !== -1; });
+          if (match || oldDev.indexOf('|') === -1) {
             // Same physical device or UUID-only old record — skip server write
           } else {
             errEl.textContent = '此激活码已在其他设备使用';
