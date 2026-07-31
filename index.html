@@ -1699,6 +1699,7 @@ function refreshCountdowns() {
 function initApp() {
   renderNav();
   renderCards();
+  document.getElementById('testLabel').textContent = testMode ? '开' : '关';
 
   // iOS install guide (Safari, not in standalone mode)
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
