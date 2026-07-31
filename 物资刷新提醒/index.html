@@ -542,17 +542,21 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
-  var stored = localStorage.getItem('__did');
-  if (stored) return stored;
-  var did;
+  // Native APK: use stable system UUID (survives app kill, reinstall changes it)
   try {
     if (typeof plus !== 'undefined' && plus.device) {
-      did = plus.device.uuid || plus.device.imei;
+      var nativeId = plus.device.uuid || plus.device.imei;
+      if (nativeId) {
+        var phys = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
+        return nativeId + '|' + phys;
+      }
     }
   } catch(e) {}
-  if (!did) {
-    did = 'web_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
+  // Web fallback: localStorage UUID
+  var stored = localStorage.getItem('__did');
+  if (stored) return stored;
+  var phys2 = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
+  var did = Math.random().toString(36).slice(2) + Date.now().toString(36) + '|' + phys2;
   localStorage.setItem('__did', did);
   return did;
 }
