@@ -520,6 +520,21 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 const APP_VERSION = 1;
 const __sig = 'v2h7k9'; // 自校验签名，和服务器 version.json 比对
 
+// Replace localStorage with plus.storage on native Android (survives app kill)
+(function() {
+  if (typeof plus !== 'undefined' && plus.storage) {
+    var _ls = window.localStorage;
+    window.localStorage = {
+      getItem: function(k) { try { var v = plus.storage.getItem(k); return v !== null && v !== undefined ? v : _ls.getItem(k); } catch(e) { return _ls.getItem(k); } },
+      setItem: function(k, v) { try { plus.storage.setItem(k, String(v)); } catch(e) {} try { _ls.setItem(k, v); } catch(e) {} },
+      removeItem: function(k) { try { plus.storage.removeItem(k); } catch(e) {} try { _ls.removeItem(k); } catch(e) {} },
+      get length() { return _ls.length; },
+      key: function(i) { return _ls.key(i); },
+      clear: function() { try { _ls.clear(); } catch(e) {} }
+    };
+  }
+})();
+
 // ====== 激活码验证 ======
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
