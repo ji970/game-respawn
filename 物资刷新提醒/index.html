@@ -650,11 +650,27 @@ async function activate() {
       if (!Array.isArray(existing)) { existing = []; }
 
       if (existing.length > 0) {
-        // Compare device fingerprint
-        if (existing[0].device !== device) {
-          errEl.textContent = '此激活码已在其他设备使用';
-          btn.disabled = false; btn.textContent = '激活';
-          return;
+        var oldDev = existing[0].device;
+        if (oldDev !== device) {
+          var isOldFormat = oldDev.indexOf('x') !== -1 && oldDev.indexOf('|') !== -1;
+          if (isOldFormat) {
+            var oldStyle = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
+            if (oldDev.split('|').slice(0,3).join('|') === oldStyle) {
+              await fetch(SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash, {
+                method: 'DELETE',
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+              });
+              existing = [];
+            } else {
+              errEl.textContent = '此激活码已在其他设备使用';
+              btn.disabled = false; btn.textContent = '激活';
+              return;
+            }
+          } else {
+            errEl.textContent = '此激活码已在其他设备使用';
+            btn.disabled = false; btn.textContent = '激活';
+            return;
+          }
         }
       }
 
@@ -2093,6 +2109,8 @@ function refreshCountdowns() {
 function initApp() {
   renderNav();
   renderCards(true);
+  // Sync test mode toggle label
+  document.getElementById('testLabel').textContent = testMode ? '开' : '关';
 
   // iOS install guide (Safari, not in standalone mode)
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
