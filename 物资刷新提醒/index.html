@@ -1,0 +1,2501 @@
+<!DOCTYPE html><!-- v2 build -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-title" content="刷新提醒">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>物资刷新提醒</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #222240;
+  --text: #e0e0e0;
+  --text2: #a0a0b8;
+  --accent: #4fc3f7;
+  --accent2: #ffb74d;
+  --danger: #ef5350;
+  --success: #66bb6a;
+  --border: #2a2a45;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Header */
+header {
+  background: var(--surface);
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
+header .sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+/* Category tabs */
+nav {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 60px;
+  z-index: 9;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+nav::-webkit-scrollbar { display: none; }
+nav button {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+nav button.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Resource grid */
+main { padding: 12px; max-width: 600px; margin: 0 auto; }
+.category-title { font-size: 14px; color: var(--text2); padding: 8px 4px; display: none; }
+.category-title.visible { display: block; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+/* Resource card */
+.card {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.card:active { transform: scale(0.95); }
+.card.popup-open { z-index: 30; }
+.card.idle { border-color: transparent; }
+.card.running { border-color: var(--accent); animation: pulse 2s infinite; }
+.card.expired { border-color: var(--success); }
+
+@keyframes pulse {
+  0%, 100% { border-color: var(--accent); }
+  50% { border-color: rgba(79,195,247,0.3); }
+}
+
+.card .icon-wrap {
+  width: 48px; height: 48px;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.card .icon-wrap img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.card .icon-wrap .placeholder {
+  font-size: 22px;
+  color: var(--text2);
+}
+.card .name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card .time-label {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.card .countdown {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent2);
+  margin-top: 4px;
+  min-height: 16px;
+}
+.card .countdown.expired-text { color: var(--success); }
+.card .cancel-btn {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  line-height: 22px;
+  cursor: pointer;
+  display: none;
+  padding: 0;
+}
+.card.running .cancel-btn { display: block; }
+.card.running .cancel-btn:active { background: #c62828; }
+
+/* Notify permission banner */
+.permission-banner {
+  background: var(--surface2);
+  text-align: center;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--accent2);
+  cursor: pointer;
+  display: none;
+}
+.permission-banner.show { display: block; }
+
+/* iOS install guide */
+.ios-guide {
+  display: none;
+  background: #1b1b2f;
+  border-bottom: 1px solid #7c4dff;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #e0e0e0;
+  line-height: 1.5;
+  position: relative;
+}
+.ios-guide.show { display: block; }
+.ios-guide .close-guide {
+  position: absolute;
+  right: 8px; top: 8px;
+  background: none; border: none;
+  color: var(--text2); font-size: 16px;
+  cursor: pointer; padding: 4px 8px;
+}
+.ios-guide .icon-share {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid #4fc3f7;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin: 0 3px;
+  position: relative;
+}
+.ios-guide .icon-share::after {
+  content: '↑';
+  position: absolute;
+  top: -8px; left: 3px;
+  font-size: 8px; color: #4fc3f7;
+}
+
+/* Reset all button */
+.toolbar {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  gap: 10px;
+}
+.toolbar button {
+  padding: 6px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+
+/* Island selector */
+.island-wrap {
+  position: relative;
+  margin-top: 5px;
+}
+.island-btn {
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--accent2);
+  font-size: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.island-btn:active { background: var(--accent2); color: #000; }
+.island-popup {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 6px;
+  z-index: 20;
+  grid-template-columns: repeat(5, 26px);
+  gap: 3px;
+  margin-bottom: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.island-popup.open { display: grid; }
+.island-popup button {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 26px;
+}
+.island-popup button:active { background: var(--accent); color: #000; }
+.island-popup button.sel {
+  background: var(--accent2);
+  color: #000;
+  border-color: var(--accent2);
+  font-weight: 700;
+}
+
+.card-note {
+  font-size: 9px; color: #66bb6a; margin-top: 2px;
+  cursor: pointer; height: 14px; line-height: 14px; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; text-align: center;
+}
+.note-btn {
+  font-size: 9px; color: #66bb6a; cursor: pointer; margin-top: 2px;
+  padding: 1px 5px; border: 1px solid #2a2a45; border-radius: 6px;
+  background: transparent; display: inline-block;
+}
+.note-btn:active { background: #2a2a45; }
+
+.daily-badge {
+  display: inline-block;
+  background: #7c4dff;
+  color: #fff;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-top: 3px;
+}
+
+
+
+.fav-star { position:absolute; top:2px; left:2px; width:18px; height:18px; border:none; background:transparent; font-size:12px; cursor:pointer; padding:0; line-height:18px; opacity:0.4; } .fav-star.on { opacity:1; }
+/* Clone button */
+.clone-btn {
+  position: absolute;
+  bottom: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 14px; line-height: 18px;
+  cursor: pointer; padding: 0;
+  display: none;
+}
+.card.running .clone-btn { display: block; }
+.clone-popup {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 21;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.clone-popup.open { display: flex; flex-wrap: wrap; gap: 4px; }
+.clone-popup button {
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  min-width: 24px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.clone-popup button:active { background: var(--accent); color: #000; }
+.clone-popup button.busy { border-color: var(--accent2); color: var(--accent2); }
+.clone-dots {
+  display: flex; gap: 2px; justify-content: center; margin-top: 3px;
+}
+.clone-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent2);
+  display: none;
+}
+.clone-dot.active { display: block; }
+
+/* Lock screen */
+.lock-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: #0f0f1a;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.lock-overlay.hidden { display: none; }
+.lock-box {
+  text-align: center; max-width: 320px; width: 100%;
+}
+.lock-box h2 { font-size: 22px; margin-bottom: 4px; }
+.lock-box .lock-sub {
+  font-size: 13px; color: var(--text2); margin-bottom: 20px;
+}
+.lock-box input {
+  width: 100%; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 18px; text-align: center;
+  font-family: monospace; letter-spacing: 2px;
+}
+.lock-box input:focus { outline: none; border-color: var(--accent); }
+.lock-box button {
+  width: 100%; padding: 14px; margin-top: 14px;
+  border-radius: 10px; border: none; background: var(--accent);
+  color: #000; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.lock-box button:active { background: #29b6f6; }
+.lock-error { color: var(--danger); font-size: 12px; margin-top: 10px; min-height: 18px; }
+.lock-footer {
+  margin-top: 20px; font-size: 11px; color: var(--text2);
+}
+.lock-status {
+  display: none; font-size: 10px; color: var(--success);
+  text-align: center; padding: 2px 8px;
+}
+.lock-status.show { display: block; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  color: var(--text);
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 300;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  border: 1px solid var(--border);
+}
+.toast.show { opacity: 1; }
+
+/* 后台通知引导 */
+.battery-guide-overlay {
+  position: fixed; inset: 0; z-index: 190;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.battery-guide-overlay.hidden { display: none; }
+.battery-guide-box {
+  background: var(--surface); border-radius: 16px;
+  padding: 24px 20px; max-width: 340px; width: 100%;
+  border: 1px solid var(--border); text-align: center;
+}
+.battery-guide-box h3 { font-size: 17px; margin-bottom: 4px; }
+.battery-guide-box .guide-brand { font-size: 11px; color: var(--accent); margin-bottom: 14px; }
+.battery-guide-steps { text-align: left; font-size: 13px; line-height: 1.8; margin-bottom: 18px; }
+.battery-guide-steps .step-num {
+  display: inline-block; background: var(--accent); color: #000;
+  width: 20px; height: 20px; border-radius: 50%; text-align: center;
+  font-size: 11px; font-weight: 700; line-height: 20px; margin-right: 6px;
+}
+.battery-guide-box .btn-guide-done {
+  width: 100%; padding: 12px; border-radius: 10px; border: none;
+  background: var(--accent); color: #000; font-size: 15px;
+  font-weight: 600; cursor: pointer;
+}
+.battery-guide-box .btn-guide-skip {
+  background: none; border: none; color: var(--text2);
+  font-size: 12px; margin-top: 10px; cursor: pointer; padding: 4px;
+}
+.battery-guide-box .btn-guide-later {
+  background: none; border: 1px solid var(--border); color: var(--text);
+  font-size: 12px; margin-top: 6px; cursor: pointer; padding: 6px 16px;
+  border-radius: 16px;
+}
+</style>
+</head>
+<body>
+
+<div class="lock-overlay" id="lockScreen">
+  <div class="lock-box">
+    <h2>物资刷新提醒</h2>
+    <div class="lock-sub">请输入激活码解锁</div>
+    <input type="text" id="codeInput" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off">
+    <button onclick="activate()">激活</button>
+    <div class="lock-error" id="lockError"></div>
+    <div class="lock-footer">购买激活码请联系管理员</div>
+  </div>
+</div>
+
+<!-- 后台通知引导（APK专属） -->
+<div class="battery-guide-overlay hidden" id="batteryGuide">
+  <div class="battery-guide-box">
+    <h3>🔔 确保后台通知</h3>
+    <div class="guide-brand" id="guideBrand"></div>
+    <div class="battery-guide-steps" id="guideSteps"></div>
+    <button class="btn-guide-done" id="guideOpenSettings">去设置</button>
+    <button class="btn-guide-skip" onclick="dismissBatteryGuide()">已设置好，不再提示</button>
+    <button class="btn-guide-later" onclick="snoozeBatteryGuide()">下次再提醒</button>
+    <div style="font-size:11px;color:var(--text2);margin-top:12px">不会操作？截图发给<b>豆包</b>让它帮你设置</div>
+  </div>
+</div>
+
+<header>
+  <h1>物资刷新提醒</h1>
+  <div class="sub">点击物资图标开始倒计时</div>
+  <div class="lock-status" id="lockStatus"></div>
+</header>
+
+<div class="permission-banner" id="permBanner" onclick="requestNotificationPermission()">
+  📢 点击此处开启通知权限，刷新时提醒你
+</div>
+<div class="ios-guide" id="iosGuide">
+  <button class="close-guide" onclick="document.getElementById('iosGuide').classList.remove('show')">&times;</button>
+  📱 <b>添加到主屏幕才能接收通知：</b><br>
+  点下方 <span style="color:#4fc3f7">⎋ 分享</span> 按钮 → 往下滑 →「添加到主屏幕」
+</div>
+
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<div class="toolbar">
+  <button onclick="resetAll()">重置全部计时</button>
+  <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== 版本号（修改此处强制旧版更新） ======
+const APP_VERSION = 1;
+
+// ====== 激活码验证 ======
+const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
+const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
+const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
+
+function getDeviceId() {
+  var stored = localStorage.getItem('__did');
+  if (stored) return stored;
+  var did;
+  try {
+    if (typeof plus !== 'undefined' && plus.device) {
+      did = plus.device.uuid || plus.device.imei;
+    }
+  } catch(e) {}
+  if (!did) {
+    did = 'web_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+  localStorage.setItem('__did', did);
+  return did;
+}
+
+async function hmacHex(message, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+  return Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getActivation() {
+  try { return JSON.parse(localStorage.getItem('activation')); }
+  catch(e) { return null; }
+}
+
+async function checkActivation() {
+  const act = getActivation();
+  if (!act || !act.expiryHex || !act.sig) return false;
+
+  // Verify signature (supports both old 8+8 and new 8+4+4 formats)
+  let expectedSig;
+  if (act.nonce !== undefined) {
+    expectedSig = (await hmacHex(act.expiryHex + act.nonce, ACTIVATION_SECRET)).slice(0, 4);
+  } else {
+    expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+  }
+  if (act.sig !== expectedSig) return false;
+
+  // Check device binding (local fingerprint)
+  var curDevice = getDeviceId();
+  if (act.device && act.device !== curDevice) {
+    // One-time migration from old screen-format to local UUID
+    if (act.device.indexOf('x') !== -1 && act.device.indexOf('|') !== -1) {
+      act.device = curDevice;
+      localStorage.setItem('activation', JSON.stringify(act));
+    } else {
+      return false;
+    }
+  }
+
+  // Check expiry
+  if (act.expiryHex === 'ffffffff') return true; // permanent
+  const expiry = parseInt(act.expiryHex, 16) * 1000;
+  if (Date.now() > expiry) return false;
+
+  return true;
+}
+
+async function activate() {
+  const input = document.getElementById('codeInput').value.replace(/-/g, '').trim();
+  const errEl = document.getElementById('lockError');
+  const btn = document.querySelector('#lockScreen button');
+  btn.disabled = true; btn.textContent = '验证中...';
+
+  if (input.length !== 16 || !/^[0-9a-fA-F]+$/.test(input)) {
+    errEl.textContent = '激活码格式不正确';
+    btn.disabled = false; btn.textContent = '激活';
+    return;
+  }
+
+  const expiryHex = input.slice(0, 8);
+
+  // Try new format first (8+4+4), then old format (8+8)
+  const newNonce = input.slice(8, 12);
+  const newSig = input.slice(12, 16);
+  const expectedNew = (await hmacHex(expiryHex + newNonce, ACTIVATION_SECRET)).slice(0, 4);
+
+  let sig, nonce;
+  if (newSig === expectedNew) {
+    sig = newSig;
+    nonce = newNonce;
+  } else {
+    const oldSig = input.slice(8, 16);
+    const expectedOld = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
+    if (oldSig === expectedOld) {
+      sig = oldSig;
+      nonce = undefined;
+    } else {
+      errEl.textContent = '激活码无效';
+      btn.disabled = false; btn.textContent = '激活';
+      return;
+    }
+  }
+
+  // Check not expired
+  if (expiryHex !== 'ffffffff') {
+    const expiry = parseInt(expiryHex, 16) * 1000;
+    if (Date.now() > expiry) {
+      errEl.textContent = '激活码已过期';
+      btn.disabled = false; btn.textContent = '激活';
+      return;
+    }
+  }
+
+  const device = getDeviceId();
+  const codeHash = (await hmacHex(input, ACTIVATION_SECRET)).slice(0, 16);
+
+  // Server verification (if Supabase configured)
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      const checkRes = await fetch(
+        SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash + '&select=code_hash,device',
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
+      );
+      var existing = await checkRes.json();
+      if (!Array.isArray(existing)) { existing = []; }
+
+      if (existing.length > 0) {
+        // Compare device fingerprint
+        if (existing[0].device !== device) {
+          errEl.textContent = '此激活码已在其他设备使用';
+          btn.disabled = false; btn.textContent = '激活';
+          return;
+        }
+      }
+
+      if (existing.length === 0) {
+        var postRes = await fetch(SUPABASE_URL + '/rest/v1/activations', {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            code_hash: codeHash,
+            device: device,
+          }),
+        });
+        if (!postRes.ok) {
+          errEl.textContent = '服务器验证失败，请重试';
+          btn.disabled = false; btn.textContent = '激活';
+          return;
+        }
+      }
+    } catch(e) {
+      errEl.textContent = '网络异常，请检查网络后重试';
+      btn.disabled = false; btn.textContent = '激活';
+      return;
+    }
+  }
+
+  // Save locally
+  const actData = {
+    expiryHex: expiryHex,
+    sig: sig,
+    activatedAt: Date.now(),
+    device: device,
+  };
+  if (nonce !== undefined) actData.nonce = nonce;
+  localStorage.setItem('activation', JSON.stringify(actData));
+
+  document.getElementById('lockScreen').classList.add('hidden');
+  updateStatus();
+  initApp();
+}
+
+function updateStatus() {
+  const act = getActivation();
+  const el = document.getElementById('lockStatus');
+  if (!act) return;
+  if (act.expiryHex === 'ffffffff') {
+    el.textContent = '已激活（永久）';
+  } else {
+    const remaining = Math.ceil((parseInt(act.expiryHex, 16) * 1000 - Date.now()) / 86400000);
+    el.textContent = '已激活（剩余' + remaining + '天）';
+  }
+  el.classList.add('show');
+}
+
+// ====== 物资数据 ======
+const resources = [
+{ id:1,  name:'辣椒', cat:'crop', min:30, max:30, icon:'' },
+{ id:2,  name:'草莓', cat:'crop', min:30, max:30, icon:'' },
+{ id:3,  name:'蓝莓', cat:'crop', min:30, max:30, icon:'' },
+{ id:4,  name:'小麦', cat:'crop', min:30, max:30, icon:'' },
+{ id:5,  name:'竹笋', cat:'plant', min:120, max:120, icon:'' },
+{ id:6,  name:'毒蘑菇', cat:'plant', min:120, max:120, icon:'' },
+{ id:7,  name:'粉色烈焰', cat:'plant', min:120, max:120, icon:'' },
+{ id:8,  name:'曼陀罗', cat:'plant', min:60, max:60, icon:'' },
+{ id:9,  name:'青魔王花', cat:'plant', min:60, max:60, icon:'' },
+{ id:10, name:'幽灵百合', cat:'plant', min:40, max:40, icon:'' },
+{ id:11, name:'松露', cat:'plant', min:240, max:360, icon:'', v:true, note:'4~6h' },
+{ id:12, name:'红莲', cat:'plant', min:720, max:720, icon:'' },
+{ id:13, name:'蓝莲', cat:'plant', min:720, max:720, icon:'' },
+{ id:14, name:'龙涎草', cat:'plant', min:540, max:900, icon:'', v:true, note:'9~15h' },
+{ id:15, name:'水晶睡莲', cat:'plant', min:720, max:720, icon:'' },
+{ id:16, name:'夕阳花', cat:'plant', min:720, max:960, icon:'', v:true, note:'天空岛，随机点位' },
+{ id:17, name:'霜冻龙涎草', cat:'plant', min:540, max:900, icon:'', v:true, note:'北境' },
+{ id:19, name:'剑齿虎王', cat:'elite', min:25, max:25, icon:'' },
+{ id:20, name:'岩火虎王', cat:'elite', min:25, max:25, icon:'' },
+{ id:21, name:'毒液龙王', cat:'elite', min:80, max:80, icon:'' },
+{ id:22, name:'暴力兔王', cat:'elite', min:80, max:80, icon:'' },
+{ id:23, name:'水池龟', cat:'elite', min:120, max:120, icon:'' },
+{ id:24, name:'岩浆龟', cat:'elite', min:120, max:120, icon:'' },
+{ id:25, name:'巨猿', cat:'boss', min:540, max:540, icon:'' },
+{ id:26, name:'猛犸', cat:'boss', min:540, max:540, icon:'' },
+{ id:27, name:'雪猛犸', cat:'boss', min:900, max:900, icon:'' },
+{ id:28, name:'霸王龙', cat:'boss', min:720, max:720, icon:'' },
+{ id:29, name:'暗黑霸王龙', cat:'boss', min:720, max:1440, icon:'', v:true, note:'12~24h' },
+{ id:30, name:'上古鳄龙', cat:'boss', min:1440, max:1440, icon:'' },
+{ id:31, name:'卡皮巴拉', cat:'rare', min:2880, max:4320, icon:'', v:true, note:'2~3天' },
+{ id:32, name:'沼泽领主', cat:'rare', min:2880, max:4320, icon:'', v:true, note:'2~3天' },
+{ id:33, name:'巨兽龙', cat:'rare', min:2880, max:10080, icon:'', v:true, note:'2~7天' },
+{ id:40, name:'深海珊瑚', cat:"plant", min:540, max:900, icon:'', v:true, note:'9~15h' },
+{ id:41, name:'金宝箱', cat:'chest', min:30, max:60, icon:'', v:true },
+{ id:42, name:'银宝箱', cat:'chest', min:30, max:60, icon:'', v:true },
+{ id:43, name:'附魔石宝箱', cat:'chest', min:60, max:180, icon:'', v:true, note:'1~3h' },
+{ id:44, name:'水晶宝箱', cat:'chest', min:45, max:75, icon:'', v:true, note:'0.75~1.25h' },
+{ id:45, name:'黑曜石宝箱', cat:'chest', min:120, max:240, icon:'', v:true, note:'2~4h' },
+{ id:46, name:'纳坦岛宝箱', cat:'chest', min:180, max:180, icon:'' },
+{ id:47, name:'天空专家宝箱', cat:'chest', min:180, max:180, icon:'' },
+{ id:48, name:'天空大师宝箱', cat:'chest', min:180, max:180, icon:'' },
+{ id:49, name:'熔火龙', cat:'dragon', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
+{ id:50, name:'北境骨龙', cat:'dragon', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
+{ id:51, name:'苍穹幻龙', cat:'dragon', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
+{ id:52, name:'海底大触手精英怪', cat:'elite', min:180, max:360, icon:'', v:true, note:'海底，3~6h' },
+{ id:53, name:'海底精英怪', cat:'elite', min:150, max:210, icon:'', v:true, note:'海底 2.5~3.5h' },
+{ id:54, name:'天空岛精英怪', cat:'elite', min:150, max:210, icon:'', v:true, note:'天空岛 2.5~3.5h' },
+{ id:55, name:'淘气仙灵', cat:"elite", min:360, max:480, icon:'', v:true, note:'6~8h' },
+{ id:56, name:'瓦雷亚宝箱', cat:'chest', min:180, max:300, icon:'', v:true, note:'3~5h' },
+{ id:57, name:'从容花苞', cat:'plant', min:60, max:120, icon:'', v:true, note:'1~2h' },
+  { id:59, name:'金甲海马', cat:'elite', min:660, max:900, icon:'', v:true, note:'11~15h' },
+  { id:60, name:'真龙宝藏', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  { id:61, name:'真龙印宝箱', cat:'chest', min:540, max:780, icon:'', v:true, note:'9~13h' },
+  { id:62, name:'柱子法师', cat:'elite', min:345, max:375, icon:'', v:true, note:'5.75~6.25h' },
+  { id:63, name:'小型法师', cat:'elite', min:150, max:210, icon:'', v:true, note:'2.5~3.5h' },
+  { id:64, name:'海鳄龙', cat:'rare', min:4320, max:15840, icon:'', v:true, note:'3~11天' },
+  { id:65, name:'北境犀鸟', cat:'elite', min:1380, max:1500, icon:'', v:true, note:'23~25h' },
+  { id:66, name:'大贝壳', cat:'elite', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  { id:67, name:'云斑鹦鸟', cat:'elite', min:360, max:480, icon:'', v:true, note:'6~8h' },
+  { id:68, name:'龟壳珍宝', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  { id:69, name:'芙蕾雅宝箱', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  { id:70, name:'邓氏鱼', cat:'elite', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  { id:71, name:'帝王蟹', cat:'elite', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  { id:72, name:'水猴子', cat:'elite', min:240, max:480, icon:'', v:true, note:'4~8h' },
+  { id:73, name:'小海豚', cat:'elite', min:90, max:210, icon:'', v:true, note:'1.5~3.5h' },
+  { id:74, name:'龙鱼王', cat:'elite', min:840, max:1560, icon:'', v:true, note:'14~26h' },
+  { id:75, name:'嘲风金翎', cat:'elite', min:540, max:780, icon:'', v:true, note:'9~13h' },
+  { id:76, name:'神酒', cat:'plant', min:360, max:480, icon:'', v:true, note:'6~8h' },
+  { id:77, name:'暴动矿源虫', cat:'elite', min:240, max:360, icon:'', v:true, note:'4~6h' },
+  { id:78, name:'聚变矿源虫', cat:'elite', min:330, max:390, icon:'', v:true, note:'5.5~6.5h' },
+  { id:79, name:'矿源巨蝎', cat:'elite', min:720, max:960, icon:'', v:true, note:'12~16h' },
+  { id:80, name:'希乌奈斯花', cat:'plant', min:120, max:120, icon:'', note:'2h' },
+  { id:81, name:'蓬莱仙', cat:'plant', min:180, max:360, icon:'', v:true, note:'3~6h' },
+  { id:82, name:'阿米特', cat:'elite', min:720, max:1440, icon:'', v:true, note:'12~24h' },
+  { id:83, name:'远古花苞', cat:'plant', min:540, max:780, icon:'', v:true, note:'9~13h' },
+  { id:84, name:'符文漩涡', cat:'elite', min:660, max:840, icon:'', v:true, note:'11~14h' },
+  { id:85, name:'噬星兽', cat:'elite', min:360, max:360, icon:'', note:'6h' },
+  { id:86, name:'星梦之匣', cat:'chest', min:240, max:240, icon:'', note:'4h' },
+  { id:87, name:'水晶矿', cat:'chest', min:30, max:30, icon:'', note:'30min' },
+  { id:88, name:'日冕草', cat:'plant', min:120, max:180, icon:'', v:true, note:'2~3h' },
+  { id:89, name:'美人鱼鳞片', cat:'plant', min:660, max:780, icon:'', v:true, note:'11~13h' },
+  { id:90, name:'钻头', cat:'elite', min:0, max:0, icon:'', note:'剩余时间+10min提醒【波动2min】' },
+  { id:91, name:'大企鹅', cat:'elite', min:180, max:420, icon:'', v:true, note:'3~7h' },
+  { id:92, name:'勇猛勋章', cat:'elite', min:240, max:480, icon:'', v:true, note:'4~8h' },
+  { id:93, name:'通灵白猿', cat:'elite', min:360, max:720, icon:'', v:true, note:'6~12h' },
+  { id:94, name:'弥莲', cat:'plant', min:540, max:900, icon:'', v:true, note:'9~15h' },
+  { id:95, name:'异星宝箱', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
+  ];
+
+// Pinyin icon filename mapping (Chinese name -> ASCII filename without extension)
+const ICON_MAP = {
+  '辣椒': 'lajiao',
+  '草莓': 'caomei',
+  '蓝莓': 'lanmei',
+  '小麦': 'xiaomai',
+  '竹笋': 'zhusun',
+  '毒蘑菇': 'dumogu',
+  '粉色烈焰': 'fenselieyan',
+  '曼陀罗': 'mantuoluo',
+  '青魔王花': 'qingmowanghua',
+  '幽灵百合': 'youlingbaihe',
+  '松露': 'songlu',
+  '红莲': 'honglian',
+  '蓝莲': 'lanlian',
+  '龙涎草': 'longxiancao',
+  '水晶睡莲': 'shuijingshuilian',
+  '夕阳花': 'xiyanghua',
+  '霜冻龙涎草': 'shuangdonglongxiancao',
+  '剑齿虎王': 'jianchihuwang',
+  '岩火虎王': 'yanhuohuwang',
+  '毒液龙王': 'duyelongwang',
+  '暴力兔王': 'baolituwang',
+  '水池龟': 'shuichigui',
+  '岩浆龟': 'yanjianggui',
+  '巨猿': 'juyuan',
+  '猛犸': 'mengma',
+  '雪猛犸': 'xuemengma',
+  '霸王龙': 'bawanglong',
+  '暗黑霸王龙': 'anheibawanglong',
+  '上古鳄龙': 'shangguelong',
+  '卡皮巴拉': 'kapibala',
+  '沼泽领主': 'zhaozelingzhu',
+  '巨兽龙': 'jushoulong',
+  '深海珊瑚': 'shenhaishanhu',
+  '金宝箱': 'jinbaoxiang',
+  '银宝箱': 'yinbaoxiang',
+  '附魔石宝箱': 'fumoshibaoxiang',
+  '水晶宝箱': 'shuijingbaoxiang',
+  '黑曜石宝箱': 'heiyaoshibaoxiang',
+  '纳坦岛宝箱': 'natandaobaoxiang',
+  '天空专家宝箱': 'tiankongzhuanjiabaoxiang',
+  '天空大师宝箱': 'tiankongdashibaoxiang',
+  '熔火龙': 'ronghuolong',
+  '北境骨龙': 'beijinggulong',
+  '苍穹幻龙': 'cangqionghuanlong',
+  '海底大触手精英怪': 'haididachushoujingyingguai',
+  '海底精英怪': 'haidijingyingguai',
+  '天空岛精英怪': 'tiankongdaojingyingguai',
+  '淘气仙灵': 'taoqixianling',
+  '瓦雷亚宝箱': 'waleiyabaoxiang',
+  '从容花苞': 'congronghuabao',
+  '金甲海马': 'jinjiahaima',
+  '真龙宝藏': 'zhenlongbaozang',
+  '真龙印宝箱': 'zhenlongyinbaoxiang',
+  '柱子法师': 'zhuzifashi',
+  '小型法师': 'xiaoxingfashi',
+  '海鳄龙': 'haielong',
+  '北境犀鸟': 'beijingxiniao',
+  '大贝壳': 'dabeike',
+  '云斑鹦鸟': 'yunbanyingniao',
+  '龟壳珍宝': 'guikezhenbao',
+  '芙蕾雅宝箱': 'fuleiyabaoxiang',
+  '邓氏鱼': 'dengshiyu',
+  '帝王蟹': 'diwangxie',
+  '水猴子': 'shuihouzi',
+  '小海豚': 'xiaohaitun',
+  '龙鱼王': 'longyuwang',
+  '嘲风金翎': 'chaofengjinling',
+  '神酒': 'shenjiu',
+  '暴动矿源虫': 'baodongkuangyuanchong',
+  '聚变矿源虫': 'jubiankuangyuanchong',
+  '矿源巨蝎': 'kuangyuanjuxie',
+  '希乌奈斯花': 'xiwunaisihua',
+  '蓬莱仙': 'penglaixian',
+  '阿米特': 'amite',
+  '远古花苞': 'yuanguhuabao',
+  '符文漩涡': 'fuwenxuanwo',
+  '噬星兽': 'shixingshou',
+  '星梦之匣': 'xingmengzhixia',
+  '水晶矿': 'shuijingkuang',
+  '日冕草': 'rimiancao',
+  '美人鱼鳞片': 'meirenyulinpian',
+  '钻头': 'zuantou',
+  '大企鹅': 'daqie',
+  '勇猛勋章': 'yongmengxunzhang',
+  '通灵白猿': 'tonglingbaiyuan',
+  '弥莲': 'milian',
+  '异星宝箱': 'yixingbaoxiang',
+};
+
+const categories = [
+  { key:'fav', label:'⭐ 常用' },
+  { key:'active', label:'⏱ 活跃计时' },
+  { key:'crop',    label:'🌾 农作物' },
+  { key:'plant',   label:'🌿 稀有植物' },
+  { key:'elite',   label:'👹 精英怪' },
+  { key:'boss',    label:'🐉 BOSS坐骑' },
+  { key:'rare',    label:'💀 稀有世界BOSS' },
+  { key:'chest',   label:'📦 宝箱' },
+  { key:'dragon',  label:'🔥 远古飞龙' },
+];
+
+// ====== 状态管理 ======
+const STORAGE_KEY = 'respawn_timers';
+const islandSelections = {}; // per-resource island selection (UI only, defaults to 1)
+const MIN_CHECK_INTERVAL = 2000; // 2秒检查一次
+let testMode = localStorage.getItem('testMode') === '1'; // 测试模式：1分钟=1秒
+let currentCat = 'crop';
+
+function loadTimers() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveTimers(t) { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); }
+
+function getTimerState(resId) {
+  const timers = loadTimers();
+  return timers[resId] || null;
+}
+
+// ====== 通知 ======
+function requestNotificationPermission() {
+  if (isNativeApp() || !('Notification' in window)) {
+    return;
+  }
+  Notification.requestPermission().then(p => {
+    if (p === 'granted') {
+      document.getElementById('permBanner').classList.remove('show');
+      toast('通知已开启');
+    } else {
+      toast('通知权限被拒绝，请在浏览器设置中开启');
+    }
+  });
+}
+
+function notify(title, body) {
+  // APK里优先用原生通知
+  if (isNativeApp() && notifyNative(title, body)) return;
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try {
+      const n = new Notification(title, {
+        body: body,
+        icon: 'icons/icon-192.png',
+        badge: 'icons/icon-72.png',
+        vibrate: [200, 100, 200],
+
+      });
+      setTimeout(() => n.close(), 8000);
+    } catch(e) { /* ignore */ }
+  }
+  // Fallback: flash title bar so user notices even without notification permission
+  let count = 0;
+  const origTitle = document.title;
+  const flash = setInterval(() => {
+    document.title = (count % 2 === 0) ? '🔔 ' + title : origTitle;
+    count++;
+    if (count >= 6) { clearInterval(flash); document.title = origTitle; }
+  }, 800);
+}
+
+// ====== 原生 APP 通知支持 ======
+function isNativeApp() {
+  return typeof plus !== 'undefined' && plus.runtime;
+}
+
+function requestNativeNotificationPermission() {
+  if (!isNativeApp()) return;
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Build = plus.android.importClass('android.os.Build');
+    var Settings = plus.android.importClass('android.provider.Settings');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var Uri = plus.android.importClass('android.net.Uri');
+    var PowerManager = plus.android.importClass('android.os.PowerManager');
+
+    // Android 13+ 需要运行时通知权限
+    if (Build.VERSION.SDK_INT >= 33) {
+      var PERM = 'android.permission.POST_NOTIFICATIONS';
+      if (main.checkSelfPermission(PERM) !== 0) {
+        main.requestPermissions([PERM], 1);
+      }
+    }
+
+    // 请求忽略电池优化（防止系统杀后台闹钟）
+    if (Build.VERSION.SDK_INT >= 23) {
+      var pm = main.getSystemService(plus.android.importClass('android.content.Context').POWER_SERVICE);
+      if (!pm.isIgnoringBatteryOptimizations(main.getPackageName())) {
+        var intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        intent.setData(Uri.parse('package:' + main.getPackageName()));
+        main.startActivity(intent);
+      }
+    }
+
+    // 隐藏Web通知横幅
+    var banner = document.getElementById('permBanner');
+    if (banner) banner.classList.remove('show');
+  } catch(e) {}
+}
+
+// ====== 手机品牌检测 & 后台引导 ======
+var PHONE_GUIDES = {
+  huawei: {
+    name: '华为',
+    steps: [
+      '打开手机<b>「设置」</b> → <b>「应用和服务」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「耗电详情」</b> → <b>「启动管理」</b>',
+      '关闭「自动管理」→ 手动开启<b>全部三项</b>（自启动、关联启动、后台活动）',
+      '切到多任务界面 → 找到物资刷新提醒 → <b>下滑锁定</b>（出现🔒图标）'
+    ],
+    settings: 'app'
+  },
+  honor: {
+    name: '荣耀',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「启动管理」</b>',
+      '关闭「自动管理」→ 手动开启<b>全部三项</b>',
+      '切到多任务界面 → 找到物资刷新提醒 → <b>下滑锁定</b>'
+    ],
+    settings: 'app'
+  },
+  xiaomi: {
+    name: '小米/红米',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用设置」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「省电策略」</b> → 设为<b>「无限制」</b>',
+      '打开<b>「手机管家」</b> → <b>「应用管理」</b> → <b>「权限」</b> → <b>「自启动管理」</b>',
+      '找到物资刷新提醒 → <b>开启自启动</b>'
+    ],
+    settings: 'app'
+  },
+  oppo: {
+    name: 'OPPO',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「耗电保护」</b> → 设为<b>「允许后台运行」</b>',
+      '<b>「手机管家」</b> → <b>「权限隐私」</b> → <b>「自启动管理」</b> → 开启物资刷新提醒'
+    ],
+    settings: 'app'
+  },
+  vivo: {
+    name: 'vivo/iQOO',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用与权限」</b> → <b>「应用管理」</b> → 找到<b>「物资刷新提醒」</b>',
+      '<b>「耗电管理」</b>或<b>「电池」</b> → 改为<b>「允许后台一直运行」</b>',
+      '如有<b>「自启动」</b>开关也打开（部分机型无此选项则跳过）',
+      '确保<b>「通知」</b>权限为允许'
+    ],
+    settings: 'app'
+  },
+  samsung: {
+    name: '三星',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用程序」</b> → 找到<b>「物资刷新提醒」</b>',
+      '<b>「电池」</b> → 设为<b>「不受限制」</b>',
+      '<b>「内存」</b> → 关闭<b>「使应用程序进入休眠」</b>'
+    ],
+    settings: 'app'
+  }
+};
+
+function detectPhoneBrand() {
+  var ua = navigator.userAgent.toUpperCase();
+  if (/HONOR/i.test(ua)) return 'honor';
+  if (/HUAWEI/i.test(ua)) return 'huawei';
+  if (/REDMI|\bMI\s|XIAOMI|POCO/i.test(ua)) return 'xiaomi';
+  if (/OPPO|PAAM|PACM/i.test(ua)) return 'oppo';
+  if (/VIVO/i.test(ua)) return 'vivo';
+  if (/SAMSUNG|SM-/i.test(ua)) return 'samsung';
+  return 'generic';
+}
+
+function showBatteryGuide() {
+  if (typeof plus === 'undefined') return;
+  if (localStorage.getItem('_bg_hide') === '1') return;
+
+  var brand = detectPhoneBrand();
+  var guide = PHONE_GUIDES[brand];
+
+  var brandEl = document.getElementById('guideBrand');
+  var stepsEl = document.getElementById('guideSteps');
+  var btnEl = document.getElementById('guideOpenSettings');
+
+  if (guide) {
+    brandEl.textContent = '检测到您的手机品牌：' + guide.name;
+    stepsEl.innerHTML = guide.steps.map(function(s, i) {
+      return '<div><span class="step-num">' + (i + 1) + '</span>' + s + '</div>';
+    }).join('');
+
+    btnEl.style.display = 'block';
+    btnEl.onclick = function() {
+      openAppSettings();
+    };
+  } else {
+    brandEl.textContent = '通用后台保活设置';
+    stepsEl.innerHTML = '<div><span class="step-num">1</span>打开<b>「设置」</b> → <b>「应用」</b> → 找到<b>「物资刷新提醒」</b></div>' +
+      '<div><span class="step-num">2</span><b>「电池」</b>或<b>「省电」</b> → 设为<b>「不限制」</b></div>' +
+      '<div><span class="step-num">3</span><b>「自启动」</b>或<b>「后台活动」</b> → 开启</div>';
+    btnEl.style.display = 'block';
+    btnEl.onclick = function() { openAppSettings(); };
+  }
+
+  document.getElementById('batteryGuide').classList.remove('hidden');
+}
+
+function dismissBatteryGuide() {
+  document.getElementById('batteryGuide').classList.add('hidden');
+  localStorage.setItem('_bg_hide', '1');
+}
+
+function snoozeBatteryGuide() {
+  document.getElementById('batteryGuide').classList.add('hidden');
+}
+
+function openAppSettings() {
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Intent = plus.android.importClass('android.content.Intent');
+    var Settings = plus.android.importClass('android.provider.Settings');
+    var Uri = plus.android.importClass('android.net.Uri');
+
+    // 跳转到app详情页
+    var intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+    intent.setData(Uri.parse('package:' + main.getPackageName()));
+    main.startActivity(intent);
+  } catch(e) {}
+}
+// ====== 引导结束 ======
+
+function notifyNative(title, body) {
+  if (!isNativeApp()) return false;
+  try {
+    // 方式1: HTML5+ 本地推送消息
+    if (plus.push) {
+      plus.push.createMessage(body, {
+        title: title,
+        cover: false,
+        when: new Date()
+      });
+      return true;
+    }
+  } catch(e) {}
+  try {
+    // 方式2: native.js 直接调 Android NotificationManager
+    var main = plus.android.runtimeMainActivity();
+    var Context = plus.android.importClass('android.content.Context');
+    var NotificationManager = plus.android.importClass('android.app.NotificationManager');
+    var Notification = plus.android.importClass('android.app.Notification');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
+    var Build = plus.android.importClass('android.os.Build');
+    var nm = main.getSystemService(Context.NOTIFICATION_SERVICE);
+    var CH_ID = 'respawn_timer';
+    if (Build.VERSION.SDK_INT >= 26) {
+      var NotificationChannel = plus.android.importClass('android.app.NotificationChannel');
+      var channel = new NotificationChannel(CH_ID, '物资刷新提醒', NotificationManager.IMPORTANCE_HIGH);
+      channel.enableVibration(true);
+      nm.createNotificationChannel(channel);
+    }
+    var intent = new Intent(main, main.getClass());
+    intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
+    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000; // FLAG_IMMUTABLE
+    var pi = PendingIntent.getActivity(main, 0, intent, flags);
+    var drawable = plus.android.importClass('android.R$drawable');
+    var builder;
+    if (Build.VERSION.SDK_INT >= 26) {
+      builder = new Notification.Builder(main, CH_ID);
+    } else {
+      builder = new Notification.Builder(main);
+    }
+    builder.setContentTitle(title);
+    builder.setContentText(body);
+    builder.setSmallIcon(drawable.ic_dialog_info);
+    builder.setAutoCancel(true);
+    builder.setContentIntent(pi);
+    builder.setDefaults(Notification.DEFAULT_VIBRATE | Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND);
+    builder.setPriority(Notification.PRIORITY_HIGH);
+    nm.notify(Math.floor(Date.now() % 100000), builder.build());
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+// ====== 渲染 ======
+function formatTime(minutes) {
+  if (minutes < 60) return minutes + '分钟';
+  if (minutes < 1440) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? h + '小时' + m + '分' : h + '小时';
+  }
+  const d = Math.floor(minutes / 1440);
+  const rest = minutes % 1440;
+  const h = Math.floor(rest / 60);
+  if (h > 0) return d + '天' + h + '小时';
+  return d + '天';
+}
+
+function formatCountdown(remainingSeconds) {
+  if (remainingSeconds <= 0) return '已刷新';
+  const s = Math.abs(remainingSeconds);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  let parts = [];
+  if (d > 0) parts.push(d + '天');
+  if (h > 0) parts.push(h + '时');
+  if (m > 0) parts.push(m + '分');
+  if (parts.length === 0 || (parts.length === 1 && d === 0 && h === 0 && m < 5)) {
+    parts.push(sec + '秒');
+  }
+  return parts.join('');
+}
+
+
+// ====== 备注功能 ======
+function loadNotes() {
+  try { return JSON.parse(localStorage.getItem('resource_notes')) || {}; }
+  catch(e) { return {}; }
+}
+function getResourceNoteHtml(rid) {
+  const notes = loadNotes();
+  const note = notes[rid];
+  if (note) {
+    return '<div class="card-note" data-note-rid="'+rid+'">'+escHtml(note)+'</div>';
+  }
+  return '<div class="note-btn" data-note-rid="'+rid+'">+ 备注</div>';
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function cloneNoteHtml(rid, slot) {
+  const notes = loadNotes();
+  const key = rid + '_c' + slot;
+  const note = notes[key];
+  if (note) return '<div class=\"card-note\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">'+escHtml(note)+'</div>';
+  return '<div class=\"note-btn\" data-note-rid=\"'+rid+'\" data-note-slot=\"'+slot+'\">+ 备注</div>';
+}
+function editNote(rid, slot) {
+  const notes = loadNotes();
+  const key = slot ? rid + '_c' + slot : rid;
+  const old = notes[key] || '';
+  const input = prompt('备注位置信息：', old);
+  if (input === null) return;
+  if (input.trim() === '') {
+    delete notes[key];
+  } else {
+    notes[key] = input.trim();
+  }
+  localStorage.setItem('resource_notes', JSON.stringify(notes));
+  renderCards();
+}
+
+
+function loadFavs(){try{return JSON.parse(localStorage.getItem("favs"))||[]}catch(e){return[]}}
+function toggleFav(rid){let f=loadFavs();const i=f.indexOf(rid);if(i<0)f.push(rid);else f.splice(i,1);localStorage.setItem("favs",JSON.stringify(f));renderCards();}
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = categories.map(c =>
+    `<button class="${c.key === currentCat ? 'active' : ''}" data-cat="${c.key}">${c.label}</button>`
+  ).join('');
+  nav.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentCat = btn.dataset.cat;
+      renderNav();
+      renderCards();
+    });
+  });
+}
+
+var _lastRender = 0;
+function renderCards(immediate) {
+  if (!immediate) {
+    var now = Date.now();
+    if (now - _lastRender < 150) return;
+    _lastRender = now;
+  }
+  _doRender();
+}
+function _doRender() {
+  const main = document.getElementById('main');
+  const timers = loadTimers();
+  let items;
+  let cloneItems = [];
+  if (currentCat === 'fav') {
+    items = resources.filter(r => loadFavs().includes(r.id));
+  } else if (currentCat === 'active') {
+    // Show resources with active or completed timers + their clones
+    items = resources.filter(r => {
+      const s = timers[r.id];
+      if (!s) return false;
+      // Check main timer
+      if (s.startTime || s.daily) return true;
+      // Check clones
+      if (s.clones) {
+        for (const c of Object.values(s.clones)) {
+          if (c && (c.minNotified === false || c.maxNotified === false)) return true;
+        }
+      }
+      return false;
+    });
+    // Build clone entries for active view
+    items.forEach(r => {
+      const s = timers[r.id];
+      if (s && s.clones) {
+        [1,2,3,4,5,6,7,8,9,10].forEach(slot => {
+          const c = s.clones[slot];
+          if (c) {
+            cloneItems.push({ rid: r.id, slot: slot, clone: c });
+          }
+        });
+      }
+    });
+  } else {
+    items = resources.filter(r => r.cat === currentCat);
+  }
+
+  if (items.length === 0 && cloneItems.length === 0) {
+    main.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
+      <div style="font-size:48px;margin-bottom:12px">⏱️</div>
+      <div>${currentCat === 'fav' ? '暂无常用物资，点击⭐添加' : (currentCat === 'active' ? '暂无活跃计时，点击物资卡片开始' : '该分类暂无物资')}</div>
+    </div>`;
+    return;
+  }
+
+  main.innerHTML = `<div class="grid">${items.map(r => {
+    const state = timers[r.id];
+    const hasActiveClone = state && state.clones &&
+      Object.values(state.clones).some(c => c && (c.minNotified === false || c.maxNotified === false));
+    const mainRunning = state && (state.minNotified === false || state.maxNotified === false);
+    const isRunning = mainRunning || hasActiveClone;
+    const isExpired = state && state.minNotified === true && state.maxNotified === true && !hasActiveClone;
+    const cls = isExpired ? 'expired' : (isRunning ? 'running' : 'idle');
+
+    let countdownHtml = '';
+    let countdownCls = '';
+    if (isRunning && state.startTime) {
+      const now = Date.now();
+      const mult = testMode ? 60 : 1;
+      const elapsed = (now - state.startTime) / 1000 * mult;
+      // Find the next notification time
+      let nextCheckSec = Infinity;
+      if (state.daily) {
+        countdownHtml = '每日定时中';
+      } else {
+      const ADV = 2;
+      if (state.minNotified === false && (state.variable || state.min !== state.max)) {
+        nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
+        if (nextCheckSec <= 0) nextCheckSec = 0;
+      }
+      if (state.maxNotified === false) {
+        const maxSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+        if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
+        if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
+      }
+      if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+      if (nextCheckSec <= 0) {
+        countdownHtml = '已刷新';
+        countdownCls = 'expired-text';
+      } else {
+        const cdText = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
+          countdownHtml = '已刷新 ' + cdText + '后结束';
+        } else {
+          countdownHtml = cdText;
+        }
+      }
+      }
+    } else if (isExpired) {
+      if (state.min !== state.max) {
+        countdownHtml = '✅ 已刷新 至' + formatTime(state.max - state.min) + '后结束';
+      } else {
+        countdownHtml = '✅ 已刷新';
+      }
+      countdownCls = 'expired-text';
+    }
+
+    const timeLabel = r.min === 0 ? '自定义' : (r.v ? formatTime(r.min) + '~' + formatTime(r.max) : formatTime(r.min));
+    const timeHint = r.min === 0 && r.note ? '<div style="font-size:8px;color:var(--text2);margin-top:1px">'+r.note+'</div>' : '';
+    const noteAttr = r.note && r.min !== 0 ? ` title="${r.note}"` : '';
+
+    const island = (state && state.island) || (islandSelections[r.id]) || 1;
+    const islandHtml = '<div class="island-wrap">' +
+      '<div class="island-popup">' + Array.from({length:10}, (_,i) =>
+        '<button data-idx="'+(i+1)+'" data-rid="'+r.id+'"' + ((i+1)===island ? ' class="sel"' : '') + '>'+(i+1)+'</button>'
+      ).join('') + '</div>' +
+      '<button class="island-btn" data-rid="'+r.id+'">岛屿 ' + island + '</button>' +
+      '</div>';
+    const dailyBadge = r.daily ? '<div class="daily-badge">每日定时</div>' : '';
+
+    return `
+      <div class="card ${cls}" data-id="${r.id}"${noteAttr}>
+        <button class="cancel-btn" data-id="${r.id}">&times;</button>
+        <div class="icon-wrap">
+          <img src="icons/${(ICON_MAP[r.name] || r.name)}.png" alt="" loading="lazy"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+          <span class="placeholder" style="display:none">${r.name[0]}</span>
+        </div>
+        <div class="name">${r.name}</div>
+        <div class="time-label">${timeLabel}</div>
+        ${timeHint}
+        ${dailyBadge}
+        ${getResourceNoteHtml(r.id)}
+        <div class="countdown ${countdownCls}">${countdownHtml}</div>
+        ${islandHtml}
+        <button class="fav-star ${loadFavs().includes(r.id)?"on":""}" data-fav="${r.id}">⭐</button><button class="clone-btn" data-rid="${r.id}">+</button>
+        <div class="clone-popup" data-rid="${r.id}">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n => {
+            const clone = state && state.clones && state.clones[n];
+            const busy = clone && (clone.minNotified === false || clone.maxNotified === false);
+            const text = busy ? n + ' ⏳' : (clone ? n + ' ✓' : n);
+            return '<button class="'+(busy?'busy':'')+'" data-slot="'+n+'">'+text+'</button>';
+          }).join('')}
+        </div>
+        <div class="clone-dots">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n => {
+            const clone = state && state.clones && state.clones[n];
+            const active = clone && (clone.minNotified === false || clone.maxNotified === false);
+            return '<div class="clone-dot'+(active?' active':'')+'"></div>';
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  // Add clone cards in active view
+  if (currentCat === 'active' && cloneItems.length > 0) {
+    main.innerHTML += '<div style="font-size:12px;color:var(--text2);padding:12px 4px 4px">分身计时</div><div class="grid">' +
+    cloneItems.map(ci => {
+      const r = resources.find(x => x.id === ci.rid);
+      const c = ci.clone;
+      const mult = testMode ? 60 : 1;
+      const elapsed = (Date.now() - c.startTime) / 1000 * mult;
+      const adv = 2;
+      // For variable resources, show min->max countdown
+      let nextSec = Math.max(0, c.max * 60 - adv * 60 - elapsed);
+      if (c.variable && c.minNotified === false) {
+        const minSec = Math.max(0, c.min * 60 - adv * 60 - elapsed);
+        if (minSec > 0 && minSec < nextSec) nextSec = minSec;
+      }
+      if (nextSec <= 0) nextSec = 0;
+      let cdText;
+      if (nextSec <= 0) {
+        cdText = '✅ 已刷新';
+      } else {
+        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
+        if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
+          cdText = '已刷新 ' + t2 + '后结束';
+        } else {
+          cdText = t2;
+        }
+      }
+      const ciIsland = ci.clone.island || 1;
+      return '<div class="card running" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">' +
+        '<button class="cancel-btn" style="display:block" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">&times;</button>' +
+        '<div class="name">' + (r ? r.name : '') + ' 分身' + ci.slot + '</div>' +
+        '<div class="countdown">' + cdText + '</div>' +
+        '<div class="island-wrap"><button class="island-btn clone-island-btn" data-cid="' + ci.rid + '" data-slot="' + ci.slot + '">岛屿 ' + ciIsland + '</button>' +
+        '<div class="island-popup">' + Array.from({length:10},(_,i)=>'<button data-idx="'+(i+1)+'" data-cid="'+ci.rid+'" data-slot="'+ci.slot+'"'+(ciIsland===i+1?' class=\"sel\"':'')+'>'+(i+1)+'</button>').join('')+'</div></div>' +
+        (cloneNoteHtml(ci.rid, ci.slot)) +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  // Clone card click handler
+  // Clone ❌ button handler
+  main.querySelectorAll('.cancel-btn[data-cid]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(btn.dataset.cid);
+      const slot = parseInt(btn.dataset.slot);
+      cancelTimer(rid, slot);
+      toast(resources.find(x => x.id === rid)?.name + ' 分身' + slot + ' 已停止');
+    });
+  });
+  // Clone card click - show info
+  main.querySelectorAll('.card[data-cid]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.cancel-btn')) return;
+      const noteEl = e.target.closest('.card-note, .note-btn');
+      if (noteEl) {
+        editNote(parseInt(noteEl.dataset.noteRid), parseInt(noteEl.dataset.noteSlot));
+        return;
+      }
+      // Clone island popup toggle
+      const ciBtn = e.target.closest('.clone-island-btn');
+      if (ciBtn) {
+        const popup = ciBtn.parentElement.querySelector('.island-popup');
+        const wasOpen = popup.classList.contains('open');
+        closeAllPopups();
+        if (!wasOpen) popup.classList.add('open');
+        return;
+      }
+      // Clone island selection
+      const ciPopupBtn = e.target.closest('.island-popup button');
+      if (ciPopupBtn && ciPopupBtn.dataset.cid) {
+        const idx = parseInt(ciPopupBtn.dataset.idx);
+        const timers = loadTimers();
+        if (timers[ciPopupBtn.dataset.cid]?.clones?.[ciPopupBtn.dataset.slot]) {
+          timers[ciPopupBtn.dataset.cid].clones[ciPopupBtn.dataset.slot].island = idx;
+          saveTimers(timers);
+        }
+        closeAllPopups();
+        renderCards();
+        return;
+      }
+      const c = (loadTimers()[parseInt(card.dataset.cid)]?.clones || {})[parseInt(card.dataset.slot)];
+      if (c) {
+        const elapsed = Math.floor((Date.now() - c.startTime) / 60000);
+        toast((resources.find(x=>x.id===parseInt(card.dataset.cid))?.name||'')+' 分身'+card.dataset.slot+' 已过'+formatTime(elapsed)+' 剩余'+formatTime(Math.max(0,c.max-elapsed)));
+      }
+    });
+  });
+
+  // Bind events
+  main.querySelectorAll('.card:not([data-cid])').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('cancel-btn')) return;
+      if (e.target.closest('.island-wrap')) return;
+      if (e.target.classList.contains('fav-star')) { e.stopPropagation(); toggleFav(parseInt(e.target.dataset.fav)); return; }
+      const noteEl = e.target.closest('.card-note, .note-btn');
+      if (noteEl) {
+        const slot = noteEl.dataset.noteSlot ? parseInt(noteEl.dataset.noteSlot) : undefined;
+        editNote(parseInt(noteEl.dataset.noteRid), slot);
+        return;
+      }
+      onCardClick(parseInt(card.dataset.id));
+    });
+  });
+  main.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cancelTimer(parseInt(btn.dataset.id));
+      toast(resources.find(x => x.id === parseInt(btn.dataset.id))?.name + ' 计时已取消');
+    });
+  });
+  main.querySelectorAll('.island-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popup = btn.parentElement.querySelector('.island-popup');
+      const wasOpen = popup.classList.contains('open');
+      closeAllPopups();
+      if (!wasOpen) popup.classList.add('open');
+    });
+  });
+  main.querySelectorAll('.island-popup button:not([data-cid])').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(b.dataset.rid);
+      const idx = parseInt(b.dataset.idx);
+      selectIsland(rid, idx);
+      closeAllPopups();
+    });
+  });
+  // Clone island popup buttons
+  main.querySelectorAll('.island-popup button[data-cid]').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(b.dataset.cid);
+      const slot = parseInt(b.dataset.slot);
+      const idx = parseInt(b.dataset.idx);
+      const timers = loadTimers();
+      if (timers[rid]?.clones?.[slot]) {
+        timers[rid].clones[slot].island = idx;
+        saveTimers(timers);
+      }
+      closeAllPopups();
+      renderCards();
+    });
+  });
+  // Close popups when tapping outside
+  // Clone button events
+  main.querySelectorAll('.clone-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(btn.dataset.rid);
+      const popup = btn.parentElement.querySelector('.clone-popup');
+      const wasOpen = popup.classList.contains('open');
+      closeAllPopups();
+      if (!wasOpen) {
+        popup.classList.add('open');
+        btn.closest('.card').classList.add('popup-open');
+      }
+    });
+  });
+  main.querySelectorAll('.clone-popup button').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = parseInt(b.parentElement.dataset.rid);
+      const slot = parseInt(b.dataset.slot);
+      startClone(rid, slot);
+      closeAllPopups();
+    });
+  });
+  if (!document._popupListener) {
+    document._popupListener = true;
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.island-wrap') && !e.target.closest('.clone-btn') && !e.target.closest('.clone-popup')) closeAllPopups();
+    });
+  }
+  startCountdownLoop();
+}
+
+function onCardClick(resId) {
+  const r = resources.find(x => x.id === resId);
+  if (!r) return;
+  const state = getTimerState(resId);
+
+  if (state && state.daily) {
+    if (confirm(r.name + '（岛屿' + (state.island || 1) + '）\n每日0:00和12:00自动提醒中\n\n要取消每日提醒吗？')) {
+      cancelTimer(resId);
+    }
+    return;
+  }
+  if (state && state.minNotified === true && state.maxNotified === true) {
+    cancelTimer(resId);
+    toast(r.name + ' 计时已重置，再次点击开始');
+    return;
+  }
+  if (state && (state.minNotified === false || state.maxNotified === false)) {
+    const elapsed = Math.floor((Date.now() - state.startTime) / 1000 / 60);
+    const island = state.island || 1;
+    if (r.v && state.minNotified === false) {
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，' + formatTime(r.min) + '后可能刷新，' + formatTime(r.max) + '后结束');
+    } else {
+      toast(r.name + '（岛屿' + island + '）计时中，已过' + formatTime(elapsed) + '，剩余' + formatTime(Math.max(0, r.max - elapsed)));
+    }
+    return;
+  }
+
+  // Start timer - allow custom time
+  const label = r.v ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '无固定时间';
+  try {
+    const input = prompt(r.name + ' 默认刷新时间：' + label + (r.min === 0 ? '\n此物资无默认时间，请输入分钟数：' : '\n输入自定义分钟数（留空使用默认）：'), r.min === 0 ? '' : '');
+    if (input === null) return;
+    if (r.min === 0 && input.trim() === '') {
+      toast('请输入有效分钟数');
+      return;
+    }
+    if (input.trim() === '') {
+      startTimer(r);
+    } else {
+      const raw = input.trim();
+      if (raw.includes('~') || raw.includes('-')) {
+        const parts = raw.split(/[~\-]/);
+        const cm = parseInt(parts[0]); const cx = parseInt(parts[1]);
+        if (isNaN(cm) || isNaN(cx) || cm <= 0 || cx <= 0) { toast('请输入有效的分钟数，如30~60'); return; }
+        startTimer(r, Math.min(cm,cx), Math.max(cm,cx));
+      } else {
+        const cm = parseInt(raw);
+        if (isNaN(cm) || cm <= 0) { toast('请输入有效的分钟数'); return; }
+        startTimer(r, cm);
+      }
+    }
+  } catch(e) {
+    // prompt blocked by browser - use default time
+    startTimer(r);
+  }
+}
+
+function startTimer(r, customMin, customMax) {
+  const timers = loadTimers();
+  const now = Date.now();
+  const island = islandSelections[r.id] || 1;
+  const effMin = customMin || r.min;
+  const effMax = customMax || customMin || r.max;
+  const isVar = customMax ? (customMin !== customMax) : (!customMin && r.v);
+
+  const existingClones = (timers[r.id] && timers[r.id].clones) || {};
+  const timerKey = r.id + '_' + Date.now();
+
+  if (r.daily) {
+    timers[r.id] = {
+      startTime: now,
+      min: 0, max: 0,
+      minNotified: false, maxNotified: false,
+      variable: false, daily: true,
+      island: island,
+      dailyNotified: {},
+      clones: existingClones,
+      timerKey: timerKey,
+    };
+    saveTimers(timers);
+    checkDailyTimers(r.id, timers[r.id]);
+    renderCards();
+    toast('⏱ ' + r.name + '（岛屿' + island + '）：每日0:00和12:00自动提醒');
+  } else {
+    timers[r.id] = {
+      startTime: now,
+      min: effMin,
+      max: effMax,
+      minNotified: false,
+      maxNotified: false,
+      variable: isVar,
+      island: island,
+      clones: existingClones,
+      timerKey: timerKey,
+    };
+    saveTimers(timers);
+    renderCards();
+    toast('⏱ ' + r.name + '（岛屿' + island + '）：' + (isVar ? formatTime(effMin) + '~' + formatTime(effMax) : formatTime(effMax)));
+    const msPerMin = testMode ? 1000 : 60000;
+    if (isVar) {
+      schedulePush(r.name + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(effMax - effMin) + '【间隔时间】后', Date.now() + effMin * msPerMin, timerKey);
+      schedulePush(r.name + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(effMax), Date.now() + effMax * msPerMin, timerKey);
+    } else {
+      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + effMax * msPerMin, timerKey);
+    }
+  }
+
+  // Vibrate on mobile
+  if (navigator.vibrate) navigator.vibrate(50);
+}
+
+function startClone(rid, slot) {
+  const r = resources.find(x => x.id === rid);
+  const timers = loadTimers();
+  if (!timers[rid]) timers[rid] = {};
+  if (!timers[rid].clones) timers[rid].clones = {};
+
+  const existing = timers[rid].clones[slot];
+  const isRunning = existing && (existing.minNotified === false || existing.maxNotified === false);
+
+  if (isRunning) {
+    cancelTimer(rid, slot);
+    toast(r.name + ' 分身' + slot + ' 已停止');
+    return;
+  }
+
+  // Allow custom time for clones
+  let effMin = r.min, effMax = r.max, isVar = r.v || false;
+  const label = isVar ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '自定义';
+  try {
+    const input = prompt(r.name + ' 分身' + slot + ' 时间：' + label + '\n输入自定义分钟数（留空默认）：', '');
+    if (input === null) return;
+    if (input.trim() !== '') {
+      const cm = parseInt(input);
+      if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); return; }
+      effMin = cm; effMax = cm; isVar = false;
+    }
+  } catch(e) {}
+  const island = islandSelections[rid] || 1;
+  const timerKey = rid + '_' + slot + '_' + Date.now();
+  timers[rid].clones[slot] = {
+    startTime: Date.now(),
+    min: effMin, max: effMax,
+    minNotified: false, maxNotified: false,
+    variable: isVar,
+    island: island,
+    timerKey: timerKey,
+  };
+
+  saveTimers(timers);
+  renderCards();
+  toast('⏱ ' + r.name + ' 分身' + slot + '（岛屿' + island + '）');
+  if (navigator.vibrate) navigator.vibrate(50);
+  const msPerMin = testMode ? 1000 : 60000;
+  if (r.v) {
+    schedulePush(r.name + ' 分身' + slot + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(r.max - r.min) + '【间隔时间】后', Date.now() + r.min * msPerMin);
+    schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin, timerKey);
+  } else {
+    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin, timerKey);
+  }
+}
+
+function closeAllPopups() {
+  document.querySelectorAll('.island-popup.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.clone-popup.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.card.popup-open').forEach(c => c.classList.remove('popup-open'));
+}
+function selectIsland(rid, islandNum) {
+  islandSelections[rid] = islandNum;
+  const timers = loadTimers();
+  if (timers[rid]) {
+    timers[rid].island = islandNum;
+    saveTimers(timers);
+  }
+  renderCards();
+}
+
+function cancelTimer(resId, cloneSlot) {
+  const timers = loadTimers();
+  const t = timers[resId];
+  // Cancel pending push notifications
+  if (cloneSlot && t && t.clones && t.clones[cloneSlot]) {
+    cancelPushQueue(t.clones[cloneSlot].timerKey);
+  } else if (!cloneSlot && t) {
+    cancelPushQueue(t.timerKey);
+  }
+  if (cloneSlot) {
+    if (timers[resId] && timers[resId].clones) {
+      timers[resId].clones[cloneSlot] = null;
+    }
+  } else {
+    // Stop main timer but keep clones if any
+    if (timers[resId] && timers[resId].clones) {
+      const clones = timers[resId].clones;
+      timers[resId] = { clones: clones };
+      // If no active clones, remove entirely
+      const hasActive = Object.values(clones).some(c => c && (c.minNotified === false || c.maxNotified === false));
+      if (!hasActive) delete timers[resId];
+    } else {
+      delete timers[resId];
+    }
+  }
+  saveTimers(timers);
+  renderCards();
+}
+
+function resetAll() {
+  if (confirm('确定要重置所有计时吗？')) {
+    localStorage.removeItem(STORAGE_KEY);
+    closeAllPopups();
+    renderCards();
+    if (isNativeApp()) cancelAllNativeAlarms();
+    toast('所有计时已重置');
+  }
+}
+
+// ====== 计时检查循环 ======
+let timerCheckInterval = null;
+
+function checkTimers() {
+  const timers = loadTimers();
+  const now = Date.now();
+  let changed = false;
+  const testMultiplier = testMode ? 60 : 1;
+
+  for (const rid of Object.keys(timers)) {
+    const t = timers[rid];
+    if (t.daily) { checkDailyTimers(parseInt(rid), t); continue; }
+    if (t.minNotified === true && t.maxNotified === true) continue;
+
+    const elapsedReal = (now - t.startTime) / 1000;
+    const elapsed = elapsedReal * testMultiplier;
+
+    const r = resources.find(x => x.id === parseInt(rid));
+    if (!r) continue;
+
+    const islandTag = '（岛屿' + (t.island || 1) + '）';
+    const minSec = Math.max(0, t.min * 60 - 2 * 60);
+    const maxSec = Math.max(0, t.max * 60 - 2 * 60);
+
+    // Check "可能刷新" (variable only, min < max)
+    if (t.variable && t.minNotified === false && elapsed >= minSec) {
+      t.minNotified = true;
+      changed = true;
+      notify(r.name + ' 可能已刷新', islandTag + ' 刷新范围下限将至（' + formatTime(t.min) + '），请留意地图');
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+    }
+
+    // Check "必定刷新" / "已刷新"
+    if (t.maxNotified === false && elapsed >= maxSec) {
+      if (t.minNotified === false) t.minNotified = true;
+      t.maxNotified = true;
+      changed = true;
+      if (t.variable) {
+        notify(r.name + ' 已停止刷新', islandTag + ' 已到最大刷新时间（' + formatTime(t.max) + '），物资已刷新！');
+      } else {
+        notify(r.name + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(t.max) + '）');
+      }
+      if (navigator.vibrate) navigator.vibrate([500, 100, 500, 100, 500]);
+    }
+  }
+
+  // Check clones
+  for (const rid of Object.keys(timers)) {
+    const t = timers[rid];
+    if (!t.clones) continue;
+    for (const slot of [1,2,3,4,5,6,7,8,9,10]) {
+      const c = t.clones[slot];
+      if (!c || (c.minNotified === true && c.maxNotified === true)) continue;
+      const elapsedReal = (now - c.startTime) / 1000;
+      const elapsed = elapsedReal * testMultiplier;
+      const r = resources.find(x => x.id === parseInt(rid));
+      if (!r) continue;
+      const islandTag = '（岛屿' + (c.island || 1) + '）';
+      const minSec = Math.max(0, c.min * 60 - 2 * 60);
+      const maxSec = Math.max(0, c.max * 60 - 2 * 60);
+      if (c.variable && c.minNotified === false && elapsed >= minSec) {
+        c.minNotified = true; changed = true;
+        notify(r.name + ' 分身' + slot + ' 刷新时间已到', islandTag + ' 至' + formatTime(c.max - c.min) + '【间隔时间】后可能刷新！');
+        if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+      }
+      if (c.maxNotified === false && elapsed >= maxSec) {
+        if (c.minNotified === false) c.minNotified = true;
+        c.maxNotified = true; changed = true;
+        if (c.variable) {
+          notify(r.name + ' 分身' + slot + ' 已停止刷新', islandTag + ' 已到最大刷新时间（' + formatTime(c.max) + '）');
+        } else {
+          notify(r.name + ' 分身' + slot + ' 物资已刷新', islandTag + ' 刷新时间将至（' + formatTime(c.max) + '）');
+        }
+        if (navigator.vibrate) navigator.vibrate([500, 100, 500, 100, 500]);
+      }
+    }
+  }
+
+  if (changed) {
+    saveTimers(timers);
+    renderCards();
+  }
+}
+
+// ====== Toast ======
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ====== 每日定时检查（远古花苞） ======
+function checkDailyTimers(rid, t) {
+  const now = new Date();
+  const islandTag = '（岛屿' + (t.island || 1) + '）';
+  const r = resources.find(x => x.id === rid);
+  if (!r) return;
+
+  const targets = [
+    { h: 0, m: 0, label: '0:00' },
+    { h: 12, m: 0, label: '12:00' },
+  ];
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let nextTarget = null;
+  let changed = false;
+  const timers = loadTimers();
+  if (!timers[rid]) return;
+
+  // Init notified set if needed
+  if (!timers[rid].dailyNotified) timers[rid].dailyNotified = {};
+
+  for (const target of targets) {
+    const targetTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), target.h, target.m, 0);
+    const targetKey = today.toDateString() + '-' + target.label;
+
+    if (now >= targetTime && !timers[rid].dailyNotified[targetKey]) {
+      timers[rid].dailyNotified[targetKey] = true;
+      changed = true;
+      notify(r.name + ' 刷新提醒', islandTag + ' 每日' + target.label + ' 定时刷新时间到！');
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+    }
+
+    if (targetTime > now) {
+      if (!nextTarget || targetTime < nextTarget) nextTarget = targetTime;
+    }
+  }
+
+  if (changed) saveTimers(timers);
+
+  if (!nextTarget) {
+    nextTarget = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
+  }
+
+  const delay = nextTarget.getTime() - now.getTime() - 2 * 60 * 1000;
+  if (delay > 0) {
+    setTimeout(() => {
+      const t2 = loadTimers();
+      if (t2[rid] && t2[rid].daily) {
+        checkDailyTimers(rid, t2[rid]);
+      }
+    }, Math.min(delay, 2147483647));
+  }
+}
+
+// ====== 测试模式 ======
+function toggleTestMode() {
+  testMode = !testMode;
+  localStorage.setItem('testMode', testMode ? '1' : '0');
+  document.getElementById('testLabel').textContent = testMode ? '开' : '关';
+  if (testMode) {
+    toast('测试模式：1分钟=1秒（倒计时会很快）');
+  } else {
+    toast('已恢复正常时间');
+  }
+  renderCards();
+}
+
+// ====== 轻量刷新倒计时 ======
+var _cdTimer = null;
+function startCountdownLoop() {
+  if (_cdTimer) clearInterval(_cdTimer);
+  _cdTimer = setInterval(function() {
+    try { refreshCountdowns(); } catch(e) {}
+  }, 1000);
+}
+
+function refreshCountdowns() {
+  const timers = loadTimers();
+  const mult = testMode ? 60 : 1;
+  const cards = document.querySelectorAll('.card.running');
+  cards.forEach(card => {
+    const rid = parseInt(card.dataset.id);
+    const state = timers[rid];
+    if (!state || !state.startTime) return;
+    const r = resources.find(x => x.id === rid);
+    if (!r) return;
+
+    if (state.daily) {
+      const cdEl = card.querySelector('.countdown');
+      if (cdEl) { cdEl.textContent = '每日定时中'; cdEl.className = 'countdown'; }
+      return;
+    }
+
+    const elapsed = (Date.now() - state.startTime) / 1000 * mult;
+    const ADV = 2;
+    let nextCheckSec = Infinity;
+    if (state.minNotified === false && (state.variable || state.min !== state.max)) {
+      nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
+      if (nextCheckSec <= 0) nextCheckSec = 0;
+    }
+    if (state.maxNotified === false) {
+      const maxSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+      if (maxSec < nextCheckSec && maxSec > 0) nextCheckSec = maxSec;
+      if (maxSec <= 0 && state.minNotified === true) nextCheckSec = 0;
+    }
+    if (nextCheckSec === Infinity) nextCheckSec = Math.max(0, (state.max || r.max) * 60 - ADV * 60) - elapsed;
+
+    const cdEl = card.querySelector('.countdown');
+    if (cdEl) {
+      if (nextCheckSec <= 0) {
+        cdEl.textContent = '已刷新';
+        cdEl.className = 'countdown expired-text';
+      } else {
+        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
+          cdEl.textContent = '已刷新 ' + t2 + '后结束';
+        } else {
+          cdEl.textContent = t2;
+        }
+        cdEl.className = 'countdown';
+      }
+    }
+
+    // Update clone dots
+    if (state.clones) {
+      const dots = card.querySelectorAll('.clone-dot');
+      [1,2,3,4,5,6,7,8,9,10].forEach(slot => {
+        const c = state.clones[slot];
+        const active = c && (c.minNotified === false || c.maxNotified === false);
+        if (dots[slot-1]) {
+          if (active) dots[slot-1].classList.add('active');
+          else dots[slot-1].classList.remove('active');
+        }
+      });
+    }
+  });
+
+  // Update clone card countdowns
+  document.querySelectorAll('.card[data-cid]').forEach(card => {
+    const rid = parseInt(card.dataset.cid);
+    const slot = parseInt(card.dataset.slot);
+    const state = timers[rid];
+    if (!state || !state.clones || !state.clones[slot]) return;
+    const c = state.clones[slot];
+    if (!c.startTime) return;
+    const elapsed = (Date.now() - c.startTime) / 1000 * mult;
+    const ADV = 2;
+    let nextSec = Math.max(0, c.max * 60 - ADV * 60 - elapsed);
+    if (c.variable && c.minNotified === false) {
+      const minSec = Math.max(0, c.min * 60 - ADV * 60 - elapsed);
+      if (minSec > 0 && minSec < nextSec) nextSec = minSec;
+    }
+    const cdEl = card.querySelector('.countdown');
+    if (cdEl) {
+      if (nextSec <= 0) {
+        cdEl.textContent = '✅ 已刷新';
+        cdEl.className = 'countdown expired-text';
+      } else {
+        const t2 = '⏳ ' + formatCountdown(Math.ceil(nextSec));
+        if (c.variable && c.minNotified === true && c.maxNotified === false && c.min !== c.max) {
+          cdEl.textContent = '已刷新 ' + t2 + '后结束';
+        } else {
+          cdEl.textContent = t2;
+        }
+        cdEl.className = 'countdown';
+      }
+    }
+  });
+}
+
+// ====== 初始化 ======
+function initApp() {
+  renderNav();
+  renderCards(true);
+
+  // iOS install guide (Safari, not in standalone mode)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = navigator.standalone ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && !isStandalone) {
+    document.getElementById('iosGuide').classList.add('show');
+  }
+
+  // In-app browser guide (WeChat, QQ, etc.)
+  const ua = navigator.userAgent;
+  const isInApp = /MicroMessenger|QQ\//i.test(ua) && !isStandalone;
+  if (isInApp) {
+    const guide = document.getElementById('iosGuide');
+    guide.innerHTML = '<button class="close-guide" onclick="document.getElementById(\'iosGuide\').classList.remove(\'show\')">&times;</button>' +
+      '⚠️ <b>请用系统浏览器打开：</b><br>点右上角 <b>···</b> →「在浏览器中打开」→ 再添加到主屏幕';
+    guide.classList.add('show');
+  }
+
+  // Show notification permission banner on iOS if not granted (APK跳过，用原生通知)
+  if (!isNativeApp() && 'Notification' in window && Notification.permission !== 'granted') {
+    document.getElementById('permBanner').classList.add('show');
+  }
+  if (!isNativeApp() && 'Notification' in window && Notification.permission === 'granted') {
+    document.getElementById('permBanner').classList.remove('show');
+  }
+
+  // Start checking loop
+  timerCheckInterval = setInterval(checkTimers, MIN_CHECK_INTERVAL);
+  startCountdownLoop();
+
+  // Check immediately for timers that expired while away
+  checkTimers();
+
+  // Register service worker and subscribe to push (跳过APK，原生通知不需要SW)
+  if (!isNativeApp() && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Wait for SW to be ready before subscribing
+      navigator.serviceWorker.ready.then(() => subscribePush(reg));
+    }).catch(() => {});
+  }
+
+  // APK: 初始化原生通知权限 + 启动后台闹钟
+  if (typeof plus !== 'undefined') {
+    function _onPlusReady() {
+      requestNativeNotificationPermission();
+      scheduleNextNativeAlarm();
+      setTimeout(showBatteryGuide, 1500);
+    }
+    if (plus.runtime) {
+      _onPlusReady();
+    } else {
+      document.addEventListener('plusready', _onPlusReady, false);
+    }
+  }
+}
+
+let pushSubscription = null;
+let pushErrorMsg = '';
+
+async function subscribePush(reg, showToast = true) {
+  if (isNativeApp() || !('PushManager' in window) || !('Notification' in window)) {
+    return;
+  }
+
+  // Step 1: check notification permission
+  const curPerm = Notification.permission;
+  if (curPerm === 'denied') {
+    pushErrorMsg = '通知已被阻止，去设置开启';
+    if (showToast) toast(pushErrorMsg);
+    return;
+  }
+  if (curPerm !== 'granted') {
+    try {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') {
+        pushErrorMsg = '未允许通知';
+        if (showToast) toast(pushErrorMsg);
+        return;
+      }
+    } catch(e) {
+      pushErrorMsg = '权限请求失败';
+      if (showToast) toast(pushErrorMsg);
+      return;
+    }
+  }
+
+  // Step 2: get SW registration
+  try {
+    if (!reg) reg = await navigator.serviceWorker.ready;
+  } catch(e) {
+    pushErrorMsg = 'SW未就绪';
+    if (showToast) toast(pushErrorMsg);
+    return;
+  }
+
+  // Step 3: try subscribing
+  try {
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      pushSubscription = sub;
+      pushErrorMsg = '';
+      if (showToast) toast('推送已订阅');
+      return;
+    }
+
+    // Try with VAPID key first, then without
+    let err1 = null, err2 = null;
+    const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+
+    // Attempt 1: with VAPID key
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyBytes,
+      });
+    } catch(e) { err1 = e; }
+
+    if (sub) {
+      // Success with VAPID key
+      pushSubscription = sub;
+      pushErrorMsg = '';
+      document.getElementById('permBanner').classList.remove('show');
+      if (showToast) toast('推送订阅成功！');
+      return;
+    }
+
+    // Attempt 2: without VAPID key
+    try {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true });
+    } catch(e) { err2 = e; }
+
+    if (sub) {
+      // Keyless succeeded but VAPID failed - key is the problem
+      await sub.unsubscribe();
+      pushErrorMsg = '密钥无效';
+      if (showToast) toast('密钥无效');
+      return;
+    }
+
+    // Both failed
+    pushErrorMsg = '推送不可用';
+    if (showToast) toast('推送订阅失败');
+
+  } catch(e) {
+    pushErrorMsg = '订阅失败';
+    if (showToast) toast(pushErrorMsg);
+  }
+}
+
+function urlB64ToUint8(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const len = raw.length;
+  const buf = new ArrayBuffer(len);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < len; i++) {
+    view[i] = raw.charCodeAt(i);
+  }
+  return buf;
+}
+
+function arrayBufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// ====== 原生AlarmManager后台定时推送 ======
+var _nativeAlarmId = Date.now() % 100000;
+
+function scheduleNextNativeAlarm() {
+  if (!isNativeApp()) return;
+  try {
+    // 取消旧闹钟
+    cancelAllNativeAlarms();
+
+    // 遍历所有计时器，找最近的下一个通知时间
+    var timers = loadTimers();
+    var now = Date.now();
+    var nearest = null;
+    var nearestTitle = '';
+    var nearestBody = '';
+
+    for (var rid of Object.keys(timers)) {
+      var t = timers[rid];
+      var r = resources.find(function(x) { return x.id === parseInt(rid); });
+      if (!r) continue;
+      var islandTag = t.island ? '（岛屿' + t.island + '）' : '';
+
+      if (t.daily) {
+        // 每日定时: 检查今天和明天的目标时间
+        for (var k = 0; k < (r.dailyTimes || []).length; k++) {
+          var target = r.dailyTimes[k];
+          var parts = target.label.split(':');
+          var targetH = parseInt(parts[0]);
+          var targetM = parseInt(parts[1]);
+          var targetTime = new Date();
+          targetTime.setHours(targetH, targetM, 0, 0);
+          if (targetTime.getTime() <= now) targetTime.setDate(targetTime.getDate() + 1);
+          if (!nearest || targetTime.getTime() < nearest) {
+            nearest = targetTime.getTime();
+            nearestTitle = r.name + ' 刷新提醒';
+            nearestBody = islandTag + ' 每日' + target.label + ' 定时刷新时间到！';
+          }
+        }
+        continue;
+      }
+
+      if (!t.startTime) continue;
+      var elapsed = (now - t.startTime) / 60000;
+
+      // 主计时器
+      if (t.min > 0 && !t.minNotified) {
+        var minTime = t.startTime + t.min * 60000;
+        if (minTime > now && (!nearest || minTime < nearest)) {
+          nearest = minTime;
+          nearestTitle = r.name + ' 刷新时间已到';
+          nearestBody = islandTag + ' 至' + formatTime(t.max - t.min) + '【间隔时间】后';
+        }
+      }
+      if (!t.maxNotified) {
+        var maxTime = t.startTime + t.max * 60000;
+        if (maxTime > now && (!nearest || maxTime < nearest)) {
+          nearest = maxTime;
+          nearestTitle = r.name + (t.min > 0 ? ' 物资已刷新' : ' 已停止刷新');
+          nearestBody = islandTag + ' 刷新时间到';
+        }
+      }
+
+      // 分身计时器
+      var clones = t.clones || {};
+      for (var slot of Object.keys(clones)) {
+        var c = clones[slot];
+        if (!c || !c.startTime) continue;
+        var cIslandTag = c.island ? '（岛屿' + c.island + '）' : '';
+        if (!c.minNotified) {
+          var cMinTime = c.startTime + c.min * 60000;
+          if (cMinTime > now && (!nearest || cMinTime < nearest)) {
+            nearest = cMinTime;
+            nearestTitle = r.name + ' 分身' + slot + ' 刷新时间已到';
+            nearestBody = cIslandTag + ' 至' + formatTime(c.max - c.min) + '【间隔时间】后';
+          }
+        }
+        if (!c.maxNotified) {
+          var cMaxTime = c.startTime + c.max * 60000;
+          if (cMaxTime > now && (!nearest || cMaxTime < nearest)) {
+            nearest = cMaxTime;
+            nearestTitle = r.name + ' 分身' + slot + (c.min > 0 ? ' 物资已刷新' : ' 已停止刷新');
+            nearestBody = cIslandTag + ' 刷新时间到';
+          }
+        }
+      }
+    }
+
+    if (nearest) {
+      setNativeAlarm(nearest, nearestTitle, nearestBody);
+    }
+  } catch(e) {}
+}
+
+function setNativeAlarm(wakeAt, title, body) {
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Context = plus.android.importClass('android.content.Context');
+    var AlarmManager = plus.android.importClass('android.app.AlarmManager');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
+    var Build = plus.android.importClass('android.os.Build');
+
+    var intent = new Intent(main, main.getClass());
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
+    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000; // FLAG_IMMUTABLE
+    var pi = PendingIntent.getActivity(main, _nativeAlarmId, intent, flags);
+
+    var am = main.getSystemService(Context.ALARM_SERVICE);
+
+    // setAlarmClock 优先级最高，Doze/省电模式也不会延迟太久
+    if (Build.VERSION.SDK_INT >= 21) {
+      var AlarmClockInfo = plus.android.importClass('android.app.AlarmManager$AlarmClockInfo');
+      var clockInfo = new AlarmClockInfo(wakeAt, pi);
+      am.setAlarmClock(clockInfo, pi);
+    } else if (Build.VERSION.SDK_INT >= 19) {
+      am.setExact(AlarmManager.RTC_WAKEUP, wakeAt, pi);
+    } else {
+      am.set(AlarmManager.RTC_WAKEUP, wakeAt, pi);
+    }
+  } catch(e) {}
+}
+
+function cancelAllNativeAlarms() {
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Context = plus.android.importClass('android.content.Context');
+    var AlarmManager = plus.android.importClass('android.app.AlarmManager');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
+    var Build = plus.android.importClass('android.os.Build');
+
+    var intent = new Intent(main, main.getClass());
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
+    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000;
+    var pi = PendingIntent.getActivity(main, _nativeAlarmId, intent, flags);
+
+    var am = main.getSystemService(Context.ALARM_SERVICE);
+    am.cancel(pi);
+    pi.cancel();
+  } catch(e) {}
+}
+
+async function schedulePush(title, body, notifyAt, timerKey) {
+  // APK: 用原生AlarmManager替代Supabase推送
+  if (isNativeApp()) {
+    scheduleNextNativeAlarm();
+    return;
+  }
+  if (!pushSubscription || !SUPABASE_URL) return;
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/push_queue', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        endpoint: pushSubscription.endpoint,
+        p256dh: arrayBufferToBase64Url(pushSubscription.getKey('p256dh')),
+        auth: arrayBufferToBase64Url(pushSubscription.getKey('auth')),
+        notify_at: new Date(notifyAt).toISOString(),
+        title: title,
+        body: body,
+        timer_key: timerKey || '',
+      }),
+    });
+  } catch(e) { /* ignore */ }
+}
+
+async function cancelPushQueue(timerKey) {
+  if (isNativeApp()) {
+    scheduleNextNativeAlarm();
+    return;
+  }
+  if (!timerKey || !SUPABASE_URL) return;
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/push_queue?timer_key=eq.' + encodeURIComponent(timerKey), {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+      },
+    });
+  } catch(e) {}
+}
+
+async function init() {
+  // Version check: block old APK versions
+  try {
+    var vRes = await fetch('https://ji970.github.io/game-respawn/version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (vRes.ok) {
+      var vData = await vRes.json();
+      if (vData.min_version && (!APP_VERSION || APP_VERSION < vData.min_version)) {
+        document.getElementById('lockScreen').classList.remove('hidden');
+        document.getElementById('lockScreen').innerHTML = '<div class=\"lock-box\"><h2>版本过旧</h2><div class=\"lock-sub\">请下载最新版本</div><a href=\"' + (vData.download_url || '#') + '\" class=\"btn-guide-done\" style=\"display:block;text-decoration:none;margin-top:16px\">去更新</a></div>';
+        return;
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const valid = await checkActivation();
+    if (valid) {
+      document.getElementById('lockScreen').classList.add('hidden');
+      updateStatus();
+      initApp();
+      setTimeout(showBatteryGuide, 2000);
+    }
+  } catch(e) {
+    console.error('Init error:', e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// For Android without push support: catch up when app comes back
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    setTimeout(checkTimers, 500);
+    setTimeout(function() {
+      scheduleNextNativeAlarm();
+      showBatteryGuide();
+    }, 1000);
+  }
+});
+
+</script>
+
+</body>
+</html>
