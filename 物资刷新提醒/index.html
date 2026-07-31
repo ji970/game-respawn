@@ -580,13 +580,9 @@ async function preloadAssets() {
   // Check device binding (local fingerprint)
   var curDevice = getDeviceId();
   if (act.device && act.device !== curDevice) {
-    // One-time migration from old screen-format to local UUID
-    if (act.device.indexOf('x') !== -1 && act.device.indexOf('|') !== -1) {
-      act.device = curDevice;
-      localStorage.setItem('activation', JSON.stringify(act));
-    } else {
-      return false;
-    }
+    // Migrate to current format (same app = same device)
+    act.device = curDevice;
+    localStorage.setItem('activation', JSON.stringify(act));
   }
 
   // Check expiry
