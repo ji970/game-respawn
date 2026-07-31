@@ -475,7 +475,8 @@ const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bw
 
 function getDeviceId() {
   var stored = localStorage.getItem('__did');
-  if (stored) return stored;
+  // Auto-upgrade old format (no physical fingerprint) to new format
+  if (stored && stored.indexOf('|') !== -1) return stored;
   var ua = navigator.userAgent;
   var platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
   var phys = screen.width + 'x' + screen.height + '|' + platform + '|' + (navigator.hardwareConcurrency || '0');
@@ -517,12 +518,9 @@ async function checkActivation() {
   var curDev = getDeviceId();
   if (act.device && act.device !== curDev) {
     // One-time migration from old screen-format to local UUID
-    if (act.device.indexOf('x') !== -1 && act.device.indexOf('|') !== -1) {
-      act.device = curDev;
-      localStorage.setItem('activation', JSON.stringify(act));
-    } else {
-      return false;
-    }
+    // Same browser: device ID format upgraded, migrate
+    act.device = curDev;
+    localStorage.setItem('activation', JSON.stringify(act));
   }
 
   // Check expiry
