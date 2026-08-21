@@ -462,6 +462,64 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   font-size: 12px; margin-top: 6px; cursor: pointer; padding: 6px 16px;
   border-radius: 16px;
 }
+
+/* Custom resource modal */
+.custom-modal-overlay {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.custom-modal-overlay.hidden { display: none; }
+.custom-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px; width: 100%; max-width: 340px;
+  max-height: 90vh; overflow-y: auto;
+}
+.custom-modal h3 { font-size: 17px; margin-bottom: 6px; text-align: center; }
+.custom-modal label { display: block; font-size: 12px; color: var(--text2); margin: 10px 0 4px; }
+.custom-modal input[type=text], .custom-modal select {
+  width: 100%; padding: 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); font-size: 15px; box-sizing: border-box;
+}
+.custom-modal input[type=text]:focus, .custom-modal select:focus { outline: none; border-color: var(--accent); }
+.cm-pick-btn {
+  width: 100%; padding: 8px; border-radius: 8px;
+  border: 1px dashed var(--border); background: transparent;
+  color: var(--accent); font-size: 13px; cursor: pointer; margin-top: 4px;
+}
+.cm-icon-preview { margin-top: 8px; text-align: center; }
+.cm-icon-preview img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
+.cm-actions { display: flex; gap: 10px; margin-top: 18px; }
+.cm-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+.cm-save { background: var(--accent); color: #000; }
+.cm-save:active { background: #29b6f6; }
+.cm-cancel { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+/* Custom resource list inside modal */
+.cm-list-title { font-size: 12px; color: var(--text2); margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.cm-list { margin-top: 8px; max-height: 220px; overflow-y: auto; }
+.cm-list-empty { font-size: 12px; color: var(--text2); text-align: center; padding: 12px; }
+.cm-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 6px; border-bottom: 1px solid var(--border);
+}
+.cm-item-icon { width: 32px; height: 32px; flex-shrink: 0; }
+.cm-item-icon img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.cm-item-ph {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+  display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 14px;
+}
+.cm-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cm-item-name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-item-time { font-size: 10px; color: var(--text2); margin-top: 1px; }
+.cm-item button {
+  flex-shrink: 0; font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: transparent; cursor: pointer;
+}
+.cm-item-edit { color: var(--accent); border-color: var(--accent); }
+.cm-item-del { color: var(--danger); border-color: var(--danger); }
 </style>
 </head>
 <body>
@@ -511,6 +569,29 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 <div class="toolbar">
   <button onclick="resetAll()">重置全部计时</button>
   <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
+  <button onclick="openCustomModal()">＋ 新增物资</button>
+</div>
+
+<div class="custom-modal-overlay hidden" id="customModal">
+  <div class="custom-modal">
+    <h3 id="customModalTitle">新增物资</h3>
+    <label>名称</label>
+    <input type="text" id="cmName" placeholder="如：龙涎草" autocomplete="off">
+    <label>刷新时间（分钟，支持 30 或 30~60）</label>
+    <input type="text" id="cmTime" placeholder="30 或 30~60" autocomplete="off">
+    <label>分类</label>
+    <select id="cmCat"></select>
+    <label>图标（可选，自动压缩）</label>
+    <input type="file" id="cmIconFile" accept="image/*" onchange="onCustomIconChange(this)" style="display:none">
+    <button type="button" class="cm-pick-btn" onclick="pickIcon()">选择图片</button>
+    <div class="cm-icon-preview" id="cmIconPreview"></div>
+    <div class="cm-actions">
+      <button class="cm-cancel" onclick="closeCustomModal()">取消</button>
+      <button class="cm-save" onclick="saveCustomResourceFromForm()">保存</button>
+    </div>
+    <div class="cm-list-title">已添加的物资</div>
+    <div class="cm-list" id="cmList"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -943,6 +1024,173 @@ const categories = [
   { key:'dragon',  label:'🔥 远古飞龙' },
 ];
 
+// ====== 自定义物资 ======
+const CUSTOM_ID_BASE = 100000;
+
+function loadCustomResources() {
+  try { return JSON.parse(localStorage.getItem('custom_resources')) || []; }
+  catch(e) { return []; }
+}
+
+function mergeCustomResources() {
+  for (let i = resources.length - 1; i >= 0; i--) {
+    if (resources[i].id >= CUSTOM_ID_BASE) resources.splice(i, 1);
+  }
+  loadCustomResources().forEach(c => resources.push(c));
+}
+
+var _editingCustomId = null;
+var _customIconData = '';
+
+function fillCustomCategories() {
+  const sel = document.getElementById('cmCat');
+  sel.innerHTML = categories.filter(c => c.key !== 'fav' && c.key !== 'active')
+    .map(c => '<option value="' + c.key + '">' + c.label + '</option>').join('');
+}
+
+function openCustomModal(id) {
+  fillCustomCategories();
+  _editingCustomId = id || null;
+  _customIconData = '';
+  document.getElementById('customModalTitle').textContent = id ? '编辑物资' : '新增物资';
+  document.getElementById('cmIconFile').value = '';
+  document.getElementById('cmIconPreview').innerHTML = '';
+
+  if (id) {
+    const r = resources.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('cmName').value = r.name;
+    document.getElementById('cmTime').value = (r.min === r.max) ? String(r.min) : (r.min + '~' + r.max);
+    document.getElementById('cmCat').value = r.cat;
+    if (r.icon) { _customIconData = r.icon; document.getElementById('cmIconPreview').innerHTML = '<img src="' + r.icon + '">'; }
+  } else {
+    document.getElementById('cmName').value = '';
+    document.getElementById('cmTime').value = '';
+    document.getElementById('cmCat').value = 'crop';
+  }
+  document.getElementById('customModal').classList.remove('hidden');
+  renderCustomList();
+}
+
+function closeCustomModal() {
+  document.getElementById('customModal').classList.add('hidden');
+}
+
+function renderCustomList() {
+  const list = document.getElementById('cmList');
+  if (!list) return;
+  const custom = loadCustomResources();
+  if (custom.length === 0) {
+    list.innerHTML = '<div class="cm-list-empty">还没有自定义物资</div>';
+    return;
+  }
+  list.innerHTML = custom.map(function(c) {
+    const iconHtml = c.icon
+      ? '<img src="' + c.icon + '">'
+      : '<span class="cm-item-ph">' + escHtml(String(c.name)[0] || '?') + '</span>';
+    const timeLabel = c.min === c.max ? formatTime(c.min) : (formatTime(c.min) + '~' + formatTime(c.max));
+    return '<div class="cm-item">' +
+      '<span class="cm-item-icon">' + iconHtml + '</span>' +
+      '<span class="cm-item-info"><span class="cm-item-name">' + escHtml(c.name) + '</span><span class="cm-item-time">' + timeLabel + '</span></span>' +
+      '<button class="cm-item-edit" onclick="openCustomModal(' + c.id + ')">编辑</button>' +
+      '<button class="cm-item-del" onclick="deleteCustomResource(' + c.id + ')">删除</button>' +
+      '</div>';
+  }).join('');
+}
+
+function compressImageUrl(url, cb) {
+  const img = new Image();
+  img.onload = function() {
+    const max = 128;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const s = Math.min(1, max / Math.max(w, h));
+    w = Math.max(1, Math.round(w * s));
+    h = Math.max(1, Math.round(h * s));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    cb(c.toDataURL('image/jpeg', 0.85));
+  };
+  img.onerror = function() { cb(null); };
+  img.src = url;
+}
+
+function applyCustomIcon(dataUrl) {
+  if (!dataUrl) return;
+  _customIconData = dataUrl;
+  document.getElementById('cmIconPreview').innerHTML = '<img src="' + dataUrl + '">';
+}
+
+function onCustomIconChange(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  compressImageUrl(url, function(dataUrl) {
+    URL.revokeObjectURL(url);
+    applyCustomIcon(dataUrl);
+  });
+}
+
+function pickIcon() {
+  if (isNativeApp() && typeof plus !== 'undefined' && plus.gallery) {
+    try {
+      plus.gallery.pick(function(path) {
+        var src = path;
+        if (typeof plus.io !== 'undefined' && plus.io.convertLocalFileSystemURL) {
+          src = plus.io.convertLocalFileSystemURL(path);
+        }
+        compressImageUrl(src, function(dataUrl) {
+          applyCustomIcon(dataUrl);
+        });
+      }, function() {}, { filter: 'image' });
+      return;
+    } catch(e) {}
+  }
+  document.getElementById('cmIconFile').click();
+}
+
+function saveCustomResourceFromForm() {
+  const name = document.getElementById('cmName').value.trim();
+  const timeRaw = document.getElementById('cmTime').value.trim();
+  const cat = document.getElementById('cmCat').value;
+  if (!name) { alert('请输入名称'); return; }
+  if (!timeRaw) { alert('请输入刷新时间（分钟）'); return; }
+  const m = timeRaw.match(/^(\d+)(?:\s*[~\-]\s*(\d+))?$/);
+  if (!m) { alert('时间格式不正确，示例：30 或 30~60'); return; }
+  let min = parseInt(m[1], 10), max = m[2] ? parseInt(m[2], 10) : min;
+  if (min <= 0 || max <= 0) { alert('时间必须大于 0'); return; }
+  if (max < min) { const t = min; min = max; max = t; }
+
+  const id = _editingCustomId || Date.now();
+  const data = { id: id, name: name, cat: cat, min: min, max: max, icon: _customIconData || '', v: (min !== max) };
+
+  const custom = loadCustomResources();
+  const idx = custom.findIndex(c => c.id === id);
+  if (idx >= 0) custom[idx] = data; else custom.push(data);
+  try {
+    localStorage.setItem('custom_resources', JSON.stringify(custom));
+  } catch(e) {
+    alert('保存失败：图标过大或存储已满，请换一张更小的图片');
+    return;
+  }
+  mergeCustomResources();
+  renderCards();
+  closeCustomModal();
+}
+
+function deleteCustomResource(id) {
+  const r = resources.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('确定删除物资「' + r.name + '」吗？')) return;
+  const custom = loadCustomResources().filter(c => c.id !== id);
+  localStorage.setItem('custom_resources', JSON.stringify(custom));
+  const timers = loadTimers();
+  if (timers[id]) { delete timers[id]; saveTimers(timers); }
+  mergeCustomResources();
+  renderCards();
+  renderCustomList();
+}
+
 // ====== 状态管理 ======
 const STORAGE_KEY = 'respawn_timers';
 const islandSelections = {}; // per-resource island selection (UI only, defaults to 1)
@@ -1371,6 +1619,7 @@ function _doRender() {
 
   main.innerHTML = `<div class="grid">${items.map(r => {
     const state = timers[r.id];
+    const iconSrc = r.icon ? r.icon : ('icons/' + (ICON_MAP[r.name] || r.name) + '.png');
     const hasActiveClone = state && state.clones &&
       Object.values(state.clones).some(c => c && (c.minNotified === false || c.maxNotified === false));
     const mainRunning = state && (state.minNotified === false || state.maxNotified === false);
@@ -1438,11 +1687,11 @@ function _doRender() {
       <div class="card ${cls}" data-id="${r.id}"${noteAttr}>
         <button class="cancel-btn" data-id="${r.id}">&times;</button>
         <div class="icon-wrap">
-          <img src="icons/${(ICON_MAP[r.name] || r.name)}.png" alt="" loading="lazy"
+          <img src="${iconSrc}" alt="" loading="lazy"
                onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
           <span class="placeholder" style="display:none">${r.name[0]}</span>
         </div>
-        <div class="name">${r.name}</div>
+        <div class="name">${escHtml(r.name)}</div>
         <div class="time-label">${timeLabel}</div>
         ${timeHint}
         ${dailyBadge}
@@ -2497,6 +2746,7 @@ async function cancelPushQueue(timerKey) {
 }
 
 async function init() {
+  mergeCustomResources();
   // Version check: block old APK versions
   try {
     var vRes = await fetch('https://ji970.github.io/game-respawn/version.json?t=' + Date.now(), { cache: 'no-store' });

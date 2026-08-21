@@ -419,13 +419,107 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   padding: 10px 24px;
   border-radius: 20px;
   font-size: 14px;
-  z-index: 100;
+  z-index: 300;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s;
   border: 1px solid var(--border);
 }
 .toast.show { opacity: 1; }
+
+/* 后台通知引导 */
+.battery-guide-overlay {
+  position: fixed; inset: 0; z-index: 190;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.battery-guide-overlay.hidden { display: none; }
+.battery-guide-box {
+  background: var(--surface); border-radius: 16px;
+  padding: 24px 20px; max-width: 340px; width: 100%;
+  border: 1px solid var(--border); text-align: center;
+}
+.battery-guide-box h3 { font-size: 17px; margin-bottom: 4px; }
+.battery-guide-box .guide-brand { font-size: 11px; color: var(--accent); margin-bottom: 14px; }
+.battery-guide-steps { text-align: left; font-size: 13px; line-height: 1.8; margin-bottom: 18px; }
+.battery-guide-steps .step-num {
+  display: inline-block; background: var(--accent); color: #000;
+  width: 20px; height: 20px; border-radius: 50%; text-align: center;
+  font-size: 11px; font-weight: 700; line-height: 20px; margin-right: 6px;
+}
+.battery-guide-box .btn-guide-done {
+  width: 100%; padding: 12px; border-radius: 10px; border: none;
+  background: var(--accent); color: #000; font-size: 15px;
+  font-weight: 600; cursor: pointer;
+}
+.battery-guide-box .btn-guide-skip {
+  background: none; border: none; color: var(--text2);
+  font-size: 12px; margin-top: 10px; cursor: pointer; padding: 4px;
+}
+.battery-guide-box .btn-guide-later {
+  background: none; border: 1px solid var(--border); color: var(--text);
+  font-size: 12px; margin-top: 6px; cursor: pointer; padding: 6px 16px;
+  border-radius: 16px;
+}
+
+/* Custom resource modal */
+.custom-modal-overlay {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.custom-modal-overlay.hidden { display: none; }
+.custom-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px; width: 100%; max-width: 340px;
+  max-height: 90vh; overflow-y: auto;
+}
+.custom-modal h3 { font-size: 17px; margin-bottom: 6px; text-align: center; }
+.custom-modal label { display: block; font-size: 12px; color: var(--text2); margin: 10px 0 4px; }
+.custom-modal input[type=text], .custom-modal select {
+  width: 100%; padding: 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); font-size: 15px; box-sizing: border-box;
+}
+.custom-modal input[type=text]:focus, .custom-modal select:focus { outline: none; border-color: var(--accent); }
+.cm-pick-btn {
+  width: 100%; padding: 8px; border-radius: 8px;
+  border: 1px dashed var(--border); background: transparent;
+  color: var(--accent); font-size: 13px; cursor: pointer; margin-top: 4px;
+}
+.cm-icon-preview { margin-top: 8px; text-align: center; }
+.cm-icon-preview img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
+.cm-actions { display: flex; gap: 10px; margin-top: 18px; }
+.cm-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+.cm-save { background: var(--accent); color: #000; }
+.cm-save:active { background: #29b6f6; }
+.cm-cancel { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+/* Custom resource list inside modal */
+.cm-list-title { font-size: 12px; color: var(--text2); margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.cm-list { margin-top: 8px; max-height: 220px; overflow-y: auto; }
+.cm-list-empty { font-size: 12px; color: var(--text2); text-align: center; padding: 12px; }
+.cm-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 6px; border-bottom: 1px solid var(--border);
+}
+.cm-item-icon { width: 32px; height: 32px; flex-shrink: 0; }
+.cm-item-icon img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.cm-item-ph {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+  display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 14px;
+}
+.cm-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cm-item-name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-item-time { font-size: 10px; color: var(--text2); margin-top: 1px; }
+.cm-item button {
+  flex-shrink: 0; font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: transparent; cursor: pointer;
+}
+.cm-item-edit { color: var(--accent); border-color: var(--accent); }
+.cm-item-del { color: var(--danger); border-color: var(--danger); }
 </style>
 </head>
 <body>
@@ -438,6 +532,19 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
     <button onclick="activate()">激活</button>
     <div class="lock-error" id="lockError"></div>
     <div class="lock-footer">购买激活码请联系管理员</div>
+  </div>
+</div>
+
+<!-- 后台通知引导（APK专属） -->
+<div class="battery-guide-overlay hidden" id="batteryGuide">
+  <div class="battery-guide-box">
+    <h3>🔔 确保后台通知</h3>
+    <div class="guide-brand" id="guideBrand"></div>
+    <div class="battery-guide-steps" id="guideSteps"></div>
+    <button class="btn-guide-done" id="guideOpenSettings">去设置</button>
+    <button class="btn-guide-skip" onclick="dismissBatteryGuide()">已设置好，不再提示</button>
+    <button class="btn-guide-later" onclick="snoozeBatteryGuide()">下次再提醒</button>
+    <div style="font-size:11px;color:var(--text2);margin-top:12px">不会操作？截图发给<b>豆包</b>让它帮你设置</div>
   </div>
 </div>
 
@@ -462,11 +569,38 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 <div class="toolbar">
   <button onclick="resetAll()">重置全部计时</button>
   <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
+  <button onclick="openCustomModal()">＋ 新增物资</button>
+</div>
+
+<div class="custom-modal-overlay hidden" id="customModal">
+  <div class="custom-modal">
+    <h3 id="customModalTitle">新增物资</h3>
+    <label>名称</label>
+    <input type="text" id="cmName" placeholder="如：龙涎草" autocomplete="off">
+    <label>刷新时间（分钟，支持 30 或 30~60）</label>
+    <input type="text" id="cmTime" placeholder="30 或 30~60" autocomplete="off">
+    <label>分类</label>
+    <select id="cmCat"></select>
+    <label>图标（可选，自动压缩）</label>
+    <input type="file" id="cmIconFile" accept="image/*" onchange="onCustomIconChange(this)" style="display:none">
+    <button type="button" class="cm-pick-btn" onclick="pickIcon()">选择图片</button>
+    <div class="cm-icon-preview" id="cmIconPreview"></div>
+    <div class="cm-actions">
+      <button class="cm-cancel" onclick="closeCustomModal()">取消</button>
+      <button class="cm-save" onclick="saveCustomResourceFromForm()">保存</button>
+    </div>
+    <div class="cm-list-title">已添加的物资</div>
+    <div class="cm-list" id="cmList"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+// ====== 版本号（修改此处强制旧版更新） ======
+const APP_VERSION = 1;
+const __sig = 'v2h7k9'; // 自校验签名，和服务器 version.json 比对
+
 // ====== 激活码验证 ======
 const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
@@ -474,15 +608,9 @@ const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const VAPID_PUBLIC = 'BEpLgLTBfLpVlTIWRkVQAVEO2XslKwqpo3UKOCUI99m9bTKnFzmCwkJ5bwPlzbvd1KsDkP8HzGzMts5BtnptHPw';
 
 function getDeviceId() {
-  var stored = localStorage.getItem('__did');
-  // Auto-upgrade old format (no physical fingerprint) to new format
-  if (stored && stored.indexOf('|') !== -1) return stored;
   var ua = navigator.userAgent;
   var platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
-  var phys = screen.width + 'x' + screen.height + '|' + platform + '|' + (navigator.hardwareConcurrency || '0');
-  var did = Math.random().toString(36).slice(2) + Date.now().toString(36) + '|' + phys;
-  localStorage.setItem('__did', did);
-  return did;
+  return screen.width + 'x' + screen.height + '|' + platform + '|' + (navigator.hardwareConcurrency || '0');
 }
 
 async function hmacHex(message, secret) {
@@ -501,9 +629,15 @@ function getActivation() {
   catch(e) { return null; }
 }
 
-async function checkActivation() {
+var __v = 0; // anti-tamper flag: set by preloadAssets, checked elsewhere
+function __iv() { if (!__v) { document.body.innerHTML = '<div style=\"color:#fff;text-align:center;padding:40px;font-size:16px\">应用已损坏，请重新下载</div>'; throw new Error(); } }
+(function() {
+  var d = parseInt(localStorage.getItem('_it') || '0');
+  if (!d) { localStorage.setItem('_it', Date.now().toString()); }
+})();
+async function preloadAssets() {
   const act = getActivation();
-  if (!act || !act.expiryHex || !act.sig) return false;
+  if (!act || !act.expiryHex || !act.sig) { __v = 0; localStorage.setItem('_dbg', '1'); return false; }
 
   // Verify signature (supports both old 8+8 and new 8+4+4 formats)
   let expectedSig;
@@ -512,22 +646,54 @@ async function checkActivation() {
   } else {
     expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
   }
-  if (act.sig !== expectedSig) return false;
+  if (act.sig !== expectedSig) { localStorage.setItem('_dbg', '2'); return false; }
 
   // Check device binding (local fingerprint)
-  var curDev = getDeviceId();
-  if (act.device && act.device !== curDev) {
-    // One-time migration from old screen-format to local UUID
-    // Same browser: device ID format upgraded, migrate
-    act.device = curDev;
+  var curDevice = getDeviceId();
+  if (act.device && act.device !== curDevice) {
+    // Migrate to current format (same app = same device)
+    act.device = curDevice;
     localStorage.setItem('activation', JSON.stringify(act));
   }
 
   // Check expiry
-  if (act.expiryHex === 'ffffffff') return true; // permanent
+  if (act.expiryHex === 'ffffffff') { __v = 1; return true; } // permanent
   const expiry = parseInt(act.expiryHex, 16) * 1000;
-  if (Date.now() > expiry) return false;
+  if (Date.now() > expiry) { localStorage.setItem('_dbg', '3'); return false; }
 
+  // Server-side validation (every 24h, with 7-day offline grace)
+  // 72h bomb: first install check is mandatory
+  var installTime = parseInt(localStorage.getItem('_it') || '0');
+  var mustCheck = installTime && (Date.now() - installTime > 259200000); // 72h
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    var lastCheck = parseInt(localStorage.getItem('_ac_last') || '0');
+    if (mustCheck || Date.now() - lastCheck > 86400000) {
+      try {
+        var codeHash = act.code_hash;
+        if (!codeHash) { if (!mustCheck) { localStorage.setItem('_ac_last', Date.now().toString()); return true; } } // 旧激活跳过，除非强制
+        var sRes = await fetch(SUPABASE_URL + '/rest/v1/activations?code_hash=eq.' + codeHash + '&select=device', {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        if (sRes.ok) {
+          var sData = await sRes.json();
+          if (Array.isArray(sData) && sData.length > 0) {
+            if (sData[0].device !== curDevice) {
+              // Device mismatch: skip for now, allow local use
+              localStorage.setItem('_dbg', '4');
+            }
+          }
+          localStorage.setItem('_ac_last', Date.now().toString());
+        } else if (mustCheck) {
+          localStorage.setItem('_dbg', '5'); return false;
+        }
+      } catch(e) {
+        if (mustCheck) { localStorage.setItem('_dbg', '6'); return false; }
+        if (Date.now() - lastCheck > 604800000) { localStorage.setItem('_dbg', '7'); return false; }
+      }
+    }
+  }
+
+  __v = 1;
   return true;
 }
 
@@ -593,7 +759,7 @@ async function activate() {
       if (existing.length > 0) {
         var oldDev = existing[0].device;
         if (oldDev !== device) {
-          // Check physical fingerprint: all key parts present in old record
+          // Check physical fingerprint (survives reinstall, cross-browser on same device)
           var phys = screen.width + 'x' + screen.height + '|' + (navigator.userAgent.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0] + '|' + (navigator.hardwareConcurrency || '0');
           var parts = phys.split('|');
           var match = parts.every(function(p) { return oldDev.indexOf(p) !== -1; });
@@ -640,9 +806,11 @@ async function activate() {
     sig: sig,
     activatedAt: Date.now(),
     device: device,
+    code_hash: codeHash,
   };
   if (nonce !== undefined) actData.nonce = nonce;
   localStorage.setItem('activation', JSON.stringify(actData));
+  __v = 1; // anti-tamper: mark as legitimately activated
 
   document.getElementById('lockScreen').classList.add('hidden');
   updateStatus();
@@ -753,6 +921,97 @@ const resources = [
   { id:95, name:'异星宝箱', cat:'chest', min:120, max:360, icon:'', v:true, note:'2~6h' },
   ];
 
+// Pinyin icon filename mapping (Chinese name -> ASCII filename without extension)
+const ICON_MAP = {
+  '辣椒': 'lajiao',
+  '草莓': 'caomei',
+  '蓝莓': 'lanmei',
+  '小麦': 'xiaomai',
+  '竹笋': 'zhusun',
+  '毒蘑菇': 'dumogu',
+  '粉色烈焰': 'fenselieyan',
+  '曼陀罗': 'mantuoluo',
+  '青魔王花': 'qingmowanghua',
+  '幽灵百合': 'youlingbaihe',
+  '松露': 'songlu',
+  '红莲': 'honglian',
+  '蓝莲': 'lanlian',
+  '龙涎草': 'longxiancao',
+  '水晶睡莲': 'shuijingshuilian',
+  '夕阳花': 'xiyanghua',
+  '霜冻龙涎草': 'shuangdonglongxiancao',
+  '剑齿虎王': 'jianchihuwang',
+  '岩火虎王': 'yanhuohuwang',
+  '毒液龙王': 'duyelongwang',
+  '暴力兔王': 'baolituwang',
+  '水池龟': 'shuichigui',
+  '岩浆龟': 'yanjianggui',
+  '巨猿': 'juyuan',
+  '猛犸': 'mengma',
+  '雪猛犸': 'xuemengma',
+  '霸王龙': 'bawanglong',
+  '暗黑霸王龙': 'anheibawanglong',
+  '上古鳄龙': 'shangguelong',
+  '卡皮巴拉': 'kapibala',
+  '沼泽领主': 'zhaozelingzhu',
+  '巨兽龙': 'jushoulong',
+  '深海珊瑚': 'shenhaishanhu',
+  '金宝箱': 'jinbaoxiang',
+  '银宝箱': 'yinbaoxiang',
+  '附魔石宝箱': 'fumoshibaoxiang',
+  '水晶宝箱': 'shuijingbaoxiang',
+  '黑曜石宝箱': 'heiyaoshibaoxiang',
+  '纳坦岛宝箱': 'natandaobaoxiang',
+  '天空专家宝箱': 'tiankongzhuanjiabaoxiang',
+  '天空大师宝箱': 'tiankongdashibaoxiang',
+  '熔火龙': 'ronghuolong',
+  '北境骨龙': 'beijinggulong',
+  '苍穹幻龙': 'cangqionghuanlong',
+  '海底大触手精英怪': 'haididachushoujingyingguai',
+  '海底精英怪': 'haidijingyingguai',
+  '天空岛精英怪': 'tiankongdaojingyingguai',
+  '淘气仙灵': 'taoqixianling',
+  '瓦雷亚宝箱': 'waleiyabaoxiang',
+  '从容花苞': 'congronghuabao',
+  '金甲海马': 'jinjiahaima',
+  '真龙宝藏': 'zhenlongbaozang',
+  '真龙印宝箱': 'zhenlongyinbaoxiang',
+  '柱子法师': 'zhuzifashi',
+  '小型法师': 'xiaoxingfashi',
+  '海鳄龙': 'haielong',
+  '北境犀鸟': 'beijingxiniao',
+  '大贝壳': 'dabeike',
+  '云斑鹦鸟': 'yunbanyingniao',
+  '龟壳珍宝': 'guikezhenbao',
+  '芙蕾雅宝箱': 'fuleiyabaoxiang',
+  '邓氏鱼': 'dengshiyu',
+  '帝王蟹': 'diwangxie',
+  '水猴子': 'shuihouzi',
+  '小海豚': 'xiaohaitun',
+  '龙鱼王': 'longyuwang',
+  '嘲风金翎': 'chaofengjinling',
+  '神酒': 'shenjiu',
+  '暴动矿源虫': 'baodongkuangyuanchong',
+  '聚变矿源虫': 'jubiankuangyuanchong',
+  '矿源巨蝎': 'kuangyuanjuxie',
+  '希乌奈斯花': 'xiwunaisihua',
+  '蓬莱仙': 'penglaixian',
+  '阿米特': 'amite',
+  '远古花苞': 'yuanguhuabao',
+  '符文漩涡': 'fuwenxuanwo',
+  '噬星兽': 'shixingshou',
+  '星梦之匣': 'xingmengzhixia',
+  '水晶矿': 'shuijingkuang',
+  '日冕草': 'rimiancao',
+  '美人鱼鳞片': 'meirenyulinpian',
+  '钻头': 'zuantou',
+  '大企鹅': 'daqie',
+  '勇猛勋章': 'yongmengxunzhang',
+  '通灵白猿': 'tonglingbaiyuan',
+  '弥莲': 'milian',
+  '异星宝箱': 'yixingbaoxiang',
+};
+
 const categories = [
   { key:'fav', label:'⭐ 常用' },
   { key:'active', label:'⏱ 活跃计时' },
@@ -764,6 +1023,173 @@ const categories = [
   { key:'chest',   label:'📦 宝箱' },
   { key:'dragon',  label:'🔥 远古飞龙' },
 ];
+
+// ====== 自定义物资 ======
+const CUSTOM_ID_BASE = 100000;
+
+function loadCustomResources() {
+  try { return JSON.parse(localStorage.getItem('custom_resources')) || []; }
+  catch(e) { return []; }
+}
+
+function mergeCustomResources() {
+  for (let i = resources.length - 1; i >= 0; i--) {
+    if (resources[i].id >= CUSTOM_ID_BASE) resources.splice(i, 1);
+  }
+  loadCustomResources().forEach(c => resources.push(c));
+}
+
+var _editingCustomId = null;
+var _customIconData = '';
+
+function fillCustomCategories() {
+  const sel = document.getElementById('cmCat');
+  sel.innerHTML = categories.filter(c => c.key !== 'fav' && c.key !== 'active')
+    .map(c => '<option value="' + c.key + '">' + c.label + '</option>').join('');
+}
+
+function openCustomModal(id) {
+  fillCustomCategories();
+  _editingCustomId = id || null;
+  _customIconData = '';
+  document.getElementById('customModalTitle').textContent = id ? '编辑物资' : '新增物资';
+  document.getElementById('cmIconFile').value = '';
+  document.getElementById('cmIconPreview').innerHTML = '';
+
+  if (id) {
+    const r = resources.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('cmName').value = r.name;
+    document.getElementById('cmTime').value = (r.min === r.max) ? String(r.min) : (r.min + '~' + r.max);
+    document.getElementById('cmCat').value = r.cat;
+    if (r.icon) { _customIconData = r.icon; document.getElementById('cmIconPreview').innerHTML = '<img src="' + r.icon + '">'; }
+  } else {
+    document.getElementById('cmName').value = '';
+    document.getElementById('cmTime').value = '';
+    document.getElementById('cmCat').value = 'crop';
+  }
+  document.getElementById('customModal').classList.remove('hidden');
+  renderCustomList();
+}
+
+function closeCustomModal() {
+  document.getElementById('customModal').classList.add('hidden');
+}
+
+function renderCustomList() {
+  const list = document.getElementById('cmList');
+  if (!list) return;
+  const custom = loadCustomResources();
+  if (custom.length === 0) {
+    list.innerHTML = '<div class="cm-list-empty">还没有自定义物资</div>';
+    return;
+  }
+  list.innerHTML = custom.map(function(c) {
+    const iconHtml = c.icon
+      ? '<img src="' + c.icon + '">'
+      : '<span class="cm-item-ph">' + escHtml(String(c.name)[0] || '?') + '</span>';
+    const timeLabel = c.min === c.max ? formatTime(c.min) : (formatTime(c.min) + '~' + formatTime(c.max));
+    return '<div class="cm-item">' +
+      '<span class="cm-item-icon">' + iconHtml + '</span>' +
+      '<span class="cm-item-info"><span class="cm-item-name">' + escHtml(c.name) + '</span><span class="cm-item-time">' + timeLabel + '</span></span>' +
+      '<button class="cm-item-edit" onclick="openCustomModal(' + c.id + ')">编辑</button>' +
+      '<button class="cm-item-del" onclick="deleteCustomResource(' + c.id + ')">删除</button>' +
+      '</div>';
+  }).join('');
+}
+
+function compressImageUrl(url, cb) {
+  const img = new Image();
+  img.onload = function() {
+    const max = 128;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const s = Math.min(1, max / Math.max(w, h));
+    w = Math.max(1, Math.round(w * s));
+    h = Math.max(1, Math.round(h * s));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    cb(c.toDataURL('image/jpeg', 0.85));
+  };
+  img.onerror = function() { cb(null); };
+  img.src = url;
+}
+
+function applyCustomIcon(dataUrl) {
+  if (!dataUrl) return;
+  _customIconData = dataUrl;
+  document.getElementById('cmIconPreview').innerHTML = '<img src="' + dataUrl + '">';
+}
+
+function onCustomIconChange(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  compressImageUrl(url, function(dataUrl) {
+    URL.revokeObjectURL(url);
+    applyCustomIcon(dataUrl);
+  });
+}
+
+function pickIcon() {
+  if (isNativeApp() && typeof plus !== 'undefined' && plus.gallery) {
+    try {
+      plus.gallery.pick(function(path) {
+        var src = path;
+        if (typeof plus.io !== 'undefined' && plus.io.convertLocalFileSystemURL) {
+          src = plus.io.convertLocalFileSystemURL(path);
+        }
+        compressImageUrl(src, function(dataUrl) {
+          applyCustomIcon(dataUrl);
+        });
+      }, function() {}, { filter: 'image' });
+      return;
+    } catch(e) {}
+  }
+  document.getElementById('cmIconFile').click();
+}
+
+function saveCustomResourceFromForm() {
+  const name = document.getElementById('cmName').value.trim();
+  const timeRaw = document.getElementById('cmTime').value.trim();
+  const cat = document.getElementById('cmCat').value;
+  if (!name) { alert('请输入名称'); return; }
+  if (!timeRaw) { alert('请输入刷新时间（分钟）'); return; }
+  const m = timeRaw.match(/^(\d+)(?:\s*[~\-]\s*(\d+))?$/);
+  if (!m) { alert('时间格式不正确，示例：30 或 30~60'); return; }
+  let min = parseInt(m[1], 10), max = m[2] ? parseInt(m[2], 10) : min;
+  if (min <= 0 || max <= 0) { alert('时间必须大于 0'); return; }
+  if (max < min) { const t = min; min = max; max = t; }
+
+  const id = _editingCustomId || Date.now();
+  const data = { id: id, name: name, cat: cat, min: min, max: max, icon: _customIconData || '', v: (min !== max) };
+
+  const custom = loadCustomResources();
+  const idx = custom.findIndex(c => c.id === id);
+  if (idx >= 0) custom[idx] = data; else custom.push(data);
+  try {
+    localStorage.setItem('custom_resources', JSON.stringify(custom));
+  } catch(e) {
+    alert('保存失败：图标过大或存储已满，请换一张更小的图片');
+    return;
+  }
+  mergeCustomResources();
+  renderCards();
+  closeCustomModal();
+}
+
+function deleteCustomResource(id) {
+  const r = resources.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('确定删除物资「' + r.name + '」吗？')) return;
+  const custom = loadCustomResources().filter(c => c.id !== id);
+  localStorage.setItem('custom_resources', JSON.stringify(custom));
+  const timers = loadTimers();
+  if (timers[id]) { delete timers[id]; saveTimers(timers); }
+  mergeCustomResources();
+  renderCards();
+  renderCustomList();
+}
 
 // ====== 状态管理 ======
 const STORAGE_KEY = 'respawn_timers';
@@ -785,8 +1211,7 @@ function getTimerState(resId) {
 
 // ====== 通知 ======
 function requestNotificationPermission() {
-  if (!('Notification' in window)) {
-    toast('你的浏览器不支持通知功能');
+  if (isNativeApp() || !('Notification' in window)) {
     return;
   }
   Notification.requestPermission().then(p => {
@@ -800,7 +1225,8 @@ function requestNotificationPermission() {
 }
 
 function notify(title, body) {
-  if (document.visibilityState === 'hidden') return; // 后台不发前台通知，避免和推送重复
+  // APK里优先用原生通知
+  if (isNativeApp() && notifyNative(title, body)) return;
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') {
     try {
@@ -822,6 +1248,231 @@ function notify(title, body) {
     count++;
     if (count >= 6) { clearInterval(flash); document.title = origTitle; }
   }, 800);
+}
+
+// ====== 原生 APP 通知支持 ======
+function isNativeApp() {
+  return typeof plus !== 'undefined' && plus.runtime;
+}
+
+function requestNativeNotificationPermission() {
+  if (!isNativeApp()) return;
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Build = plus.android.importClass('android.os.Build');
+    var Settings = plus.android.importClass('android.provider.Settings');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var Uri = plus.android.importClass('android.net.Uri');
+    var PowerManager = plus.android.importClass('android.os.PowerManager');
+
+    // Android 13+ 需要运行时通知权限
+    if (Build.VERSION.SDK_INT >= 33) {
+      var PERM = 'android.permission.POST_NOTIFICATIONS';
+      if (main.checkSelfPermission(PERM) !== 0) {
+        main.requestPermissions([PERM], 1);
+      }
+    }
+
+    // 请求忽略电池优化（防止系统杀后台闹钟）
+    if (Build.VERSION.SDK_INT >= 23) {
+      var pm = main.getSystemService(plus.android.importClass('android.content.Context').POWER_SERVICE);
+      if (!pm.isIgnoringBatteryOptimizations(main.getPackageName())) {
+        var intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        intent.setData(Uri.parse('package:' + main.getPackageName()));
+        main.startActivity(intent);
+      }
+    }
+
+    // 隐藏Web通知横幅
+    var banner = document.getElementById('permBanner');
+    if (banner) banner.classList.remove('show');
+  } catch(e) {}
+}
+
+// ====== 手机品牌检测 & 后台引导 ======
+var PHONE_GUIDES = {
+  huawei: {
+    name: '华为',
+    steps: [
+      '打开手机<b>「设置」</b> → <b>「应用和服务」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「耗电详情」</b> → <b>「启动管理」</b>',
+      '关闭「自动管理」→ 手动开启<b>全部三项</b>（自启动、关联启动、后台活动）',
+      '切到多任务界面 → 找到物资刷新提醒 → <b>下滑锁定</b>（出现🔒图标）'
+    ],
+    settings: 'app'
+  },
+  honor: {
+    name: '荣耀',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「启动管理」</b>',
+      '关闭「自动管理」→ 手动开启<b>全部三项</b>',
+      '切到多任务界面 → 找到物资刷新提醒 → <b>下滑锁定</b>'
+    ],
+    settings: 'app'
+  },
+  xiaomi: {
+    name: '小米/红米',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用设置」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「省电策略」</b> → 设为<b>「无限制」</b>',
+      '打开<b>「手机管家」</b> → <b>「应用管理」</b> → <b>「权限」</b> → <b>「自启动管理」</b>',
+      '找到物资刷新提醒 → <b>开启自启动</b>'
+    ],
+    settings: 'app'
+  },
+  oppo: {
+    name: 'OPPO',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用」</b> → <b>「应用管理」</b>',
+      '找到<b>「物资刷新提醒」</b> → <b>「耗电保护」</b> → 设为<b>「允许后台运行」</b>',
+      '<b>「手机管家」</b> → <b>「权限隐私」</b> → <b>「自启动管理」</b> → 开启物资刷新提醒'
+    ],
+    settings: 'app'
+  },
+  vivo: {
+    name: 'vivo/iQOO',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用与权限」</b> → <b>「应用管理」</b> → 找到<b>「物资刷新提醒」</b>',
+      '<b>「耗电管理」</b>或<b>「电池」</b> → 改为<b>「允许后台一直运行」</b>',
+      '如有<b>「自启动」</b>开关也打开（部分机型无此选项则跳过）',
+      '确保<b>「通知」</b>权限为允许'
+    ],
+    settings: 'app'
+  },
+  samsung: {
+    name: '三星',
+    steps: [
+      '打开<b>「设置」</b> → <b>「应用程序」</b> → 找到<b>「物资刷新提醒」</b>',
+      '<b>「电池」</b> → 设为<b>「不受限制」</b>',
+      '<b>「内存」</b> → 关闭<b>「使应用程序进入休眠」</b>'
+    ],
+    settings: 'app'
+  }
+};
+
+function detectPhoneBrand() {
+  var ua = navigator.userAgent.toUpperCase();
+  if (/HONOR/i.test(ua)) return 'honor';
+  if (/HUAWEI/i.test(ua)) return 'huawei';
+  if (/REDMI|\bMI\s|XIAOMI|POCO/i.test(ua)) return 'xiaomi';
+  if (/OPPO|PAAM|PACM/i.test(ua)) return 'oppo';
+  if (/VIVO/i.test(ua)) return 'vivo';
+  if (/SAMSUNG|SM-/i.test(ua)) return 'samsung';
+  return 'generic';
+}
+
+function showBatteryGuide() {
+  if (typeof plus === 'undefined') return;
+  if (localStorage.getItem('_bg_hide') === '1') return;
+
+  var brand = detectPhoneBrand();
+  var guide = PHONE_GUIDES[brand];
+
+  var brandEl = document.getElementById('guideBrand');
+  var stepsEl = document.getElementById('guideSteps');
+  var btnEl = document.getElementById('guideOpenSettings');
+
+  if (guide) {
+    brandEl.textContent = '检测到您的手机品牌：' + guide.name;
+    stepsEl.innerHTML = guide.steps.map(function(s, i) {
+      return '<div><span class="step-num">' + (i + 1) + '</span>' + s + '</div>';
+    }).join('');
+
+    btnEl.style.display = 'block';
+    btnEl.onclick = function() {
+      openAppSettings();
+    };
+  } else {
+    brandEl.textContent = '通用后台保活设置';
+    stepsEl.innerHTML = '<div><span class="step-num">1</span>打开<b>「设置」</b> → <b>「应用」</b> → 找到<b>「物资刷新提醒」</b></div>' +
+      '<div><span class="step-num">2</span><b>「电池」</b>或<b>「省电」</b> → 设为<b>「不限制」</b></div>' +
+      '<div><span class="step-num">3</span><b>「自启动」</b>或<b>「后台活动」</b> → 开启</div>';
+    btnEl.style.display = 'block';
+    btnEl.onclick = function() { openAppSettings(); };
+  }
+
+  document.getElementById('batteryGuide').classList.remove('hidden');
+}
+
+function dismissBatteryGuide() {
+  document.getElementById('batteryGuide').classList.add('hidden');
+  localStorage.setItem('_bg_hide', '1');
+}
+
+function snoozeBatteryGuide() {
+  document.getElementById('batteryGuide').classList.add('hidden');
+}
+
+function openAppSettings() {
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Intent = plus.android.importClass('android.content.Intent');
+    var Settings = plus.android.importClass('android.provider.Settings');
+    var Uri = plus.android.importClass('android.net.Uri');
+
+    // 跳转到app详情页
+    var intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+    intent.setData(Uri.parse('package:' + main.getPackageName()));
+    main.startActivity(intent);
+  } catch(e) {}
+}
+// ====== 引导结束 ======
+
+function notifyNative(title, body) {
+  if (!isNativeApp()) return false;
+  try {
+    // 方式1: HTML5+ 本地推送消息
+    if (plus.push) {
+      plus.push.createMessage(body, {
+        title: title,
+        cover: false,
+        when: new Date()
+      });
+      return true;
+    }
+  } catch(e) {}
+  try {
+    // 方式2: native.js 直接调 Android NotificationManager
+    var main = plus.android.runtimeMainActivity();
+    var Context = plus.android.importClass('android.content.Context');
+    var NotificationManager = plus.android.importClass('android.app.NotificationManager');
+    var Notification = plus.android.importClass('android.app.Notification');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
+    var Build = plus.android.importClass('android.os.Build');
+    var nm = main.getSystemService(Context.NOTIFICATION_SERVICE);
+    var CH_ID = 'respawn_timer';
+    if (Build.VERSION.SDK_INT >= 26) {
+      var NotificationChannel = plus.android.importClass('android.app.NotificationChannel');
+      var channel = new NotificationChannel(CH_ID, '物资刷新提醒', NotificationManager.IMPORTANCE_HIGH);
+      channel.enableVibration(true);
+      nm.createNotificationChannel(channel);
+    }
+    var intent = new Intent(main, main.getClass());
+    intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
+    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000; // FLAG_IMMUTABLE
+    var pi = PendingIntent.getActivity(main, 0, intent, flags);
+    var drawable = plus.android.importClass('android.R$drawable');
+    var builder;
+    if (Build.VERSION.SDK_INT >= 26) {
+      builder = new Notification.Builder(main, CH_ID);
+    } else {
+      builder = new Notification.Builder(main);
+    }
+    builder.setContentTitle(title);
+    builder.setContentText(body);
+    builder.setSmallIcon(drawable.ic_dialog_info);
+    builder.setAutoCancel(true);
+    builder.setContentIntent(pi);
+    builder.setDefaults(Notification.DEFAULT_VIBRATE | Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND);
+    builder.setPriority(Notification.PRIORITY_HIGH);
+    nm.notify(Math.floor(Date.now() % 100000), builder.build());
+    return true;
+  } catch(e) {
+    return false;
+  }
 }
 
 // ====== 渲染 ======
@@ -910,7 +1561,17 @@ function renderNav() {
   });
 }
 
-function renderCards() {
+var _lastRender = 0;
+function renderCards(immediate) {
+  if ((Date.now() / 60000 | 0) % 5 === 0) __iv(); // integrity spot-check
+  if (!immediate) {
+    var now = Date.now();
+    if (now - _lastRender < 150) return;
+    _lastRender = now;
+  }
+  _doRender();
+}
+function _doRender() {
   const main = document.getElementById('main');
   const timers = loadTimers();
   let items;
@@ -958,6 +1619,7 @@ function renderCards() {
 
   main.innerHTML = `<div class="grid">${items.map(r => {
     const state = timers[r.id];
+    const iconSrc = r.icon ? r.icon : ('icons/' + (ICON_MAP[r.name] || r.name) + '.png');
     const hasActiveClone = state && state.clones &&
       Object.values(state.clones).some(c => c && (c.minNotified === false || c.maxNotified === false));
     const mainRunning = state && (state.minNotified === false || state.maxNotified === false);
@@ -1025,11 +1687,11 @@ function renderCards() {
       <div class="card ${cls}" data-id="${r.id}"${noteAttr}>
         <button class="cancel-btn" data-id="${r.id}">&times;</button>
         <div class="icon-wrap">
-          <img src="icons/${r.name}.png" alt="" loading="lazy"
+          <img src="${iconSrc}" alt="" loading="lazy"
                onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
           <span class="placeholder" style="display:none">${r.name[0]}</span>
         </div>
-        <div class="name">${r.name}</div>
+        <div class="name">${escHtml(r.name)}</div>
         <div class="time-label">${timeLabel}</div>
         ${timeHint}
         ${dailyBadge}
@@ -1230,6 +1892,7 @@ function renderCards() {
       if (!e.target.closest('.island-wrap') && !e.target.closest('.clone-btn') && !e.target.closest('.clone-popup')) closeAllPopups();
     });
   }
+  startCountdownLoop();
 }
 
 function onCardClick(resId) {
@@ -1290,6 +1953,7 @@ function onCardClick(resId) {
 }
 
 function startTimer(r, customMin, customMax) {
+  __iv();
   const timers = loadTimers();
   const now = Date.now();
   const island = islandSelections[r.id] || 1;
@@ -1443,6 +2107,7 @@ function resetAll() {
     localStorage.removeItem(STORAGE_KEY);
     closeAllPopups();
     renderCards();
+    if (isNativeApp()) cancelAllNativeAlarms();
     toast('所有计时已重置');
   }
 }
@@ -1609,7 +2274,16 @@ function toggleTestMode() {
 }
 
 // ====== 轻量刷新倒计时 ======
+var _cdTimer = null;
+function startCountdownLoop() {
+  if (_cdTimer) clearInterval(_cdTimer);
+  _cdTimer = setInterval(function() {
+    try { refreshCountdowns(); } catch(e) {}
+  }, 1000);
+}
+
 function refreshCountdowns() {
+  if ((Date.now() / 30000 | 0) % 3 === 0) __iv(); // integrity spot-check
   const timers = loadTimers();
   const mult = testMode ? 60 : 1;
   const cards = document.querySelectorAll('.card.running');
@@ -1706,7 +2380,8 @@ function refreshCountdowns() {
 // ====== 初始化 ======
 function initApp() {
   renderNav();
-  renderCards();
+  renderCards(true);
+  // Sync test mode toggle label
   document.getElementById('testLabel').textContent = testMode ? '开' : '关';
 
   // iOS install guide (Safari, not in standalone mode)
@@ -1728,39 +2403,49 @@ function initApp() {
     guide.classList.add('show');
   }
 
-  // Show notification permission banner on iOS if not granted
-  if ('Notification' in window && Notification.permission !== 'granted') {
+  // Show notification permission banner on iOS if not granted (APK跳过，用原生通知)
+  if (!isNativeApp() && 'Notification' in window && Notification.permission !== 'granted') {
     document.getElementById('permBanner').classList.add('show');
   }
-  if (Notification.permission === 'granted') {
+  if (!isNativeApp() && 'Notification' in window && Notification.permission === 'granted') {
     document.getElementById('permBanner').classList.remove('show');
   }
 
   // Start checking loop
   timerCheckInterval = setInterval(checkTimers, MIN_CHECK_INTERVAL);
-  // Lightweight countdown refresh every second
-  setInterval(refreshCountdowns, 1000);
+  startCountdownLoop();
 
   // Check immediately for timers that expired while away
   checkTimers();
 
-  // Register service worker and subscribe to push
-  if ('serviceWorker' in navigator) {
+  // Register service worker and subscribe to push (跳过APK，原生通知不需要SW)
+  if (!isNativeApp() && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(reg => {
       // Wait for SW to be ready before subscribing
       navigator.serviceWorker.ready.then(() => subscribePush(reg));
     }).catch(() => {});
   }
+
+  // APK: 初始化原生通知权限 + 启动后台闹钟
+  if (typeof plus !== 'undefined') {
+    function _onPlusReady() {
+      requestNativeNotificationPermission();
+      scheduleNextNativeAlarm();
+      setTimeout(showBatteryGuide, 1500);
+    }
+    if (plus.runtime) {
+      _onPlusReady();
+    } else {
+      document.addEventListener('plusready', _onPlusReady, false);
+    }
+  }
 }
 
 let pushSubscription = null;
 let pushErrorMsg = '';
-let pendingPushQueue = [];
 
 async function subscribePush(reg, showToast = true) {
-  if (!('PushManager' in window)) {
-    pushErrorMsg = '浏览器不支持推送';
-    if (showToast) toast(pushErrorMsg);
+  if (isNativeApp() || !('PushManager' in window) || !('Notification' in window)) {
     return;
   }
 
@@ -1799,11 +2484,17 @@ async function subscribePush(reg, showToast = true) {
   try {
     let sub = await reg.pushManager.getSubscription();
     if (sub) {
-      await sub.unsubscribe();
+      pushSubscription = sub;
+      pushErrorMsg = '';
+      if (showToast) toast('推送已订阅');
+      return;
     }
 
-    var err1 = null;
-    var keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+    // Try with VAPID key first, then without
+    let err1 = null, err2 = null;
+    const keyBytes = urlB64ToUint8(VAPID_PUBLIC);
+
+    // Attempt 1: with VAPID key
     try {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -1812,47 +2503,34 @@ async function subscribePush(reg, showToast = true) {
     } catch(e) { err1 = e; }
 
     if (sub) {
+      // Success with VAPID key
       pushSubscription = sub;
       pushErrorMsg = '';
       document.getElementById('permBanner').classList.remove('show');
       if (showToast) toast('推送订阅成功！');
-      rescheduleActiveTimers();
-      var q = pendingPushQueue; pendingPushQueue = [];
-      q.forEach(function(a) { schedulePush(a[0], a[1], a[2], a[3]); });
-      updatePushStatus();
       return;
     }
 
-    // VAPID failed, try without
-    try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true }); } catch(e) {}
+    // Attempt 2: without VAPID key
+    try {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true });
+    } catch(e) { err2 = e; }
+
     if (sub) {
+      // Keyless succeeded but VAPID failed - key is the problem
       await sub.unsubscribe();
       pushErrorMsg = '密钥无效';
       if (showToast) toast('密钥无效');
-      updatePushStatus();
       return;
     }
 
+    // Both failed
     pushErrorMsg = '推送不可用';
     if (showToast) toast('推送订阅失败');
-    updatePushStatus();
 
   } catch(e) {
     pushErrorMsg = '订阅失败';
     if (showToast) toast(pushErrorMsg);
-    updatePushStatus();
-  }
-}
-
-function updatePushStatus() {
-  var el = document.getElementById('pushStatus');
-  if (!el) return;
-  if (pushSubscription) {
-    el.textContent = '✓ 推送已就绪';
-    el.style.color = '#4caf50';
-  } else {
-    el.textContent = '✗ 推送未就绪';
-    el.style.color = '#f44336';
   }
 }
 
@@ -1878,23 +2556,156 @@ function arrayBufferToBase64Url(buffer) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function waitForSubscription(timeout) {
-  timeout = timeout || 10000;
-  var start = Date.now();
-  return new Promise(function(resolve) {
-    function check() {
-      if (pushSubscription) return resolve();
-      if (Date.now() - start > timeout) return resolve();
-      setTimeout(check, 200);
+// ====== 原生AlarmManager后台定时推送 ======
+var _nativeAlarmId = Date.now() % 100000;
+
+function scheduleNextNativeAlarm() {
+  if (!isNativeApp()) return;
+  try {
+    // 取消旧闹钟
+    cancelAllNativeAlarms();
+
+    // 遍历所有计时器，找最近的下一个通知时间
+    var timers = loadTimers();
+    var now = Date.now();
+    var nearest = null;
+    var nearestTitle = '';
+    var nearestBody = '';
+
+    for (var rid of Object.keys(timers)) {
+      var t = timers[rid];
+      var r = resources.find(function(x) { return x.id === parseInt(rid); });
+      if (!r) continue;
+      var islandTag = t.island ? '（岛屿' + t.island + '）' : '';
+
+      if (t.daily) {
+        // 每日定时: 检查今天和明天的目标时间
+        for (var k = 0; k < (r.dailyTimes || []).length; k++) {
+          var target = r.dailyTimes[k];
+          var parts = target.label.split(':');
+          var targetH = parseInt(parts[0]);
+          var targetM = parseInt(parts[1]);
+          var targetTime = new Date();
+          targetTime.setHours(targetH, targetM, 0, 0);
+          if (targetTime.getTime() <= now) targetTime.setDate(targetTime.getDate() + 1);
+          if (!nearest || targetTime.getTime() < nearest) {
+            nearest = targetTime.getTime();
+            nearestTitle = r.name + ' 刷新提醒';
+            nearestBody = islandTag + ' 每日' + target.label + ' 定时刷新时间到！';
+          }
+        }
+        continue;
+      }
+
+      if (!t.startTime) continue;
+      var elapsed = (now - t.startTime) / 60000;
+
+      // 主计时器
+      if (t.min > 0 && !t.minNotified) {
+        var minTime = t.startTime + t.min * 60000;
+        if (minTime > now && (!nearest || minTime < nearest)) {
+          nearest = minTime;
+          nearestTitle = r.name + ' 刷新时间已到';
+          nearestBody = islandTag + ' 至' + formatTime(t.max - t.min) + '【间隔时间】后';
+        }
+      }
+      if (!t.maxNotified) {
+        var maxTime = t.startTime + t.max * 60000;
+        if (maxTime > now && (!nearest || maxTime < nearest)) {
+          nearest = maxTime;
+          nearestTitle = r.name + (t.min > 0 ? ' 物资已刷新' : ' 已停止刷新');
+          nearestBody = islandTag + ' 刷新时间到';
+        }
+      }
+
+      // 分身计时器
+      var clones = t.clones || {};
+      for (var slot of Object.keys(clones)) {
+        var c = clones[slot];
+        if (!c || !c.startTime) continue;
+        var cIslandTag = c.island ? '（岛屿' + c.island + '）' : '';
+        if (!c.minNotified) {
+          var cMinTime = c.startTime + c.min * 60000;
+          if (cMinTime > now && (!nearest || cMinTime < nearest)) {
+            nearest = cMinTime;
+            nearestTitle = r.name + ' 分身' + slot + ' 刷新时间已到';
+            nearestBody = cIslandTag + ' 至' + formatTime(c.max - c.min) + '【间隔时间】后';
+          }
+        }
+        if (!c.maxNotified) {
+          var cMaxTime = c.startTime + c.max * 60000;
+          if (cMaxTime > now && (!nearest || cMaxTime < nearest)) {
+            nearest = cMaxTime;
+            nearestTitle = r.name + ' 分身' + slot + (c.min > 0 ? ' 物资已刷新' : ' 已停止刷新');
+            nearestBody = cIslandTag + ' 刷新时间到';
+          }
+        }
+      }
     }
-    check();
-  });
+
+    if (nearest) {
+      setNativeAlarm(nearest, nearestTitle, nearestBody);
+    }
+  } catch(e) {}
+}
+
+function setNativeAlarm(wakeAt, title, body) {
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Context = plus.android.importClass('android.content.Context');
+    var AlarmManager = plus.android.importClass('android.app.AlarmManager');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
+    var Build = plus.android.importClass('android.os.Build');
+
+    var intent = new Intent(main, main.getClass());
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
+    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000; // FLAG_IMMUTABLE
+    var pi = PendingIntent.getActivity(main, _nativeAlarmId, intent, flags);
+
+    var am = main.getSystemService(Context.ALARM_SERVICE);
+
+    // setAlarmClock 优先级最高，Doze/省电模式也不会延迟太久
+    if (Build.VERSION.SDK_INT >= 21) {
+      var AlarmClockInfo = plus.android.importClass('android.app.AlarmManager$AlarmClockInfo');
+      var clockInfo = new AlarmClockInfo(wakeAt, pi);
+      am.setAlarmClock(clockInfo, pi);
+    } else if (Build.VERSION.SDK_INT >= 19) {
+      am.setExact(AlarmManager.RTC_WAKEUP, wakeAt, pi);
+    } else {
+      am.set(AlarmManager.RTC_WAKEUP, wakeAt, pi);
+    }
+  } catch(e) {}
+}
+
+function cancelAllNativeAlarms() {
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Context = plus.android.importClass('android.content.Context');
+    var AlarmManager = plus.android.importClass('android.app.AlarmManager');
+    var Intent = plus.android.importClass('android.content.Intent');
+    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
+    var Build = plus.android.importClass('android.os.Build');
+
+    var intent = new Intent(main, main.getClass());
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
+    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000;
+    var pi = PendingIntent.getActivity(main, _nativeAlarmId, intent, flags);
+
+    var am = main.getSystemService(Context.ALARM_SERVICE);
+    am.cancel(pi);
+    pi.cancel();
+  } catch(e) {}
 }
 
 async function schedulePush(title, body, notifyAt, timerKey) {
-  if (!pushSubscription) await waitForSubscription();
-  if (!pushSubscription) return; // timed out, still not ready
-  if (!SUPABASE_URL) return;
+  // APK: 用原生AlarmManager替代Supabase推送
+  if (isNativeApp()) {
+    scheduleNextNativeAlarm();
+    return;
+  }
+  if (!pushSubscription || !SUPABASE_URL) return;
   try {
     await fetch(SUPABASE_URL + '/rest/v1/push_queue', {
       method: 'POST',
@@ -1914,10 +2725,14 @@ async function schedulePush(title, body, notifyAt, timerKey) {
         timer_key: timerKey || '',
       }),
     });
-  } catch(e) { toast('推送注册失败: ' + (e.message || '网络错误')); }
+  } catch(e) { /* ignore */ }
 }
 
 async function cancelPushQueue(timerKey) {
+  if (isNativeApp()) {
+    scheduleNextNativeAlarm();
+    return;
+  }
   if (!timerKey || !SUPABASE_URL) return;
   try {
     await fetch(SUPABASE_URL + '/rest/v1/push_queue?timer_key=eq.' + encodeURIComponent(timerKey), {
@@ -1930,61 +2745,40 @@ async function cancelPushQueue(timerKey) {
   } catch(e) {}
 }
 
-async function rescheduleActiveTimers() {
-  if (!pushSubscription || !SUPABASE_URL) return;
-  var timers = loadTimers();
-  var msPerMin = testMode ? 1000 : 60000;
-  var now = Date.now();
-  for (var rid in timers) {
-    var t = timers[rid];
-    if (!t.startTime) continue;
-    var r = resources.find(function(x) { return String(x.id) === rid; });
-    if (!r) continue;
-    // Cancel old push entries for this timer
-    if (t.timerKey) await cancelPushQueue(t.timerKey);
-    // Calculate remaining time
-    var elapsed = now - t.startTime;
-    var remainMin = Math.max(0, t.min * msPerMin - elapsed);
-    var remainMax = Math.max(0, t.max * msPerMin - elapsed);
-    if (t.daily || t.max === 0) continue; // skip daily, already handled by checkDailyTimers
-    if (t.variable) {
-      if (remainMin > 0) schedulePush(r.name + ' 刷新时间已到', '', now + remainMin, t.timerKey);
-      if (remainMax > 0) schedulePush(r.name + ' 已停止刷新', '', now + remainMax, t.timerKey);
-    } else {
-      if (remainMax > 0) schedulePush(r.name + ' 物资已刷新', '', now + remainMax, t.timerKey);
-    }
-    // Handle clones
-    if (t.clones) {
-      for (var slot in t.clones) {
-        var c = t.clones[slot];
-        if (!c.startTime) continue;
-        var cKey = (t.timerKey || '') + '_c' + slot;
-        await cancelPushQueue(cKey);
-        var cElapsed = now - c.startTime;
-        var cRemainMin = Math.max(0, c.min * msPerMin - cElapsed);
-        var cRemainMax = Math.max(0, c.max * msPerMin - cElapsed);
-        if (c.variable) {
-          if (cRemainMin > 0) schedulePush(r.name + ' 分身' + slot + ' 刷新时间已到', '', now + cRemainMin, cKey);
-          if (cRemainMax > 0) schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '', now + cRemainMax, cKey);
-        } else {
-          if (cRemainMax > 0) schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '', now + cRemainMax, cKey);
-        }
+async function init() {
+  mergeCustomResources();
+  // Version check: block old APK versions
+  try {
+    var vRes = await fetch('https://ji970.github.io/game-respawn/version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (vRes.ok) {
+      var vData = await vRes.json();
+      if (vData.min_version && (!APP_VERSION || APP_VERSION < vData.min_version)) {
+        document.getElementById('lockScreen').classList.remove('hidden');
+        document.getElementById('lockScreen').innerHTML = '<div class=\"lock-box\"><h2>版本过旧</h2><div class=\"lock-sub\">请下载最新版本</div><a href=\"' + (vData.download_url || '#') + '\" class=\"btn-guide-done\" style=\"display:block;text-decoration:none;margin-top:16px\">去更新</a></div>';
+        return;
+      }
+      // Self-integrity: if server knows a different signature, code was tampered
+      if (vData.app_sig && typeof __sig !== 'undefined' && __sig !== vData.app_sig) {
+        // Silently lock: code has been modified
+        document.getElementById('lockScreen').classList.remove('hidden');
+        document.getElementById('lockScreen').innerHTML = '<div class=\"lock-box\"><h2>应用已损坏</h2><div class=\"lock-sub\">请重新下载安装</div><a href=\"' + (vData.download_url || '#') + '\" class=\"btn-guide-done\" style=\"display:block;text-decoration:none;margin-top:16px\">重新下载</a></div>';
+        return;
       }
     }
-  }
-}
+  } catch(e) {}
 
-async function init() {
   try {
-    const valid = await checkActivation();
+    var dbg = localStorage.getItem('_dbg');
+    if (dbg) { document.getElementById('lockError').textContent = 'ERR:' + dbg; }
+    const valid = await preloadAssets();
     if (valid) {
       document.getElementById('lockScreen').classList.add('hidden');
       updateStatus();
       initApp();
+      setTimeout(showBatteryGuide, 2000);
     }
   } catch(e) {
     console.error('Init error:', e);
-    // Make sure lock screen stays visible and functional if init fails
   }
 }
 
@@ -1992,7 +2786,13 @@ document.addEventListener('DOMContentLoaded', init);
 
 // For Android without push support: catch up when app comes back
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') setTimeout(checkTimers, 500);
+  if (document.visibilityState === 'visible') {
+    setTimeout(checkTimers, 500);
+    setTimeout(function() {
+      scheduleNextNativeAlarm();
+      showBatteryGuide();
+    }, 1000);
+  }
 });
 
 </script>
