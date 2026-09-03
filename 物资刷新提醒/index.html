@@ -238,6 +238,8 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   font-size: 12px;
   cursor: pointer;
 }
+#recallBtn.recall-on { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.recall-mode .clone-btn { display: block !important; }
 
 
 /* Island selector */
@@ -520,6 +522,37 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 }
 .cm-item-edit { color: var(--accent); border-color: var(--accent); }
 .cm-item-del { color: var(--danger); border-color: var(--danger); }
+/* 模式徽章 */
+.mode-chip {
+  display: none;
+  font-size: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin: 6px auto 0;
+  width: fit-content;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+.test-mode-chip {
+  background: rgba(255,183,77,0.12);
+  color: #ffb74d;
+  border: 1px solid rgba(255,183,77,0.35);
+}
+.recall-chip {
+  background: rgba(124,77,255,0.12);
+  color: #b388ff;
+  border: 1px solid rgba(124,77,255,0.35);
+}
+body.test-mode .test-mode-chip { display: block; }
+body.recall-mode .recall-chip { display: block; }
+
+/* 测试模式：轻微暖色调 + 卡片橙红边 */
+body.test-mode main { filter: sepia(0.1) saturate(1.08); }
+body.test-mode .card { border-color: rgba(255,183,77,0.5); }
+
+/* 回忆模式：轻微复古暗色 + 卡片紫色柔和发光 */
+body.recall-mode main { filter: grayscale(0.25) brightness(0.88); }
+body.recall-mode .card { border-color: rgba(124,77,255,0.55); box-shadow: 0 0 8px rgba(124,77,255,0.28); }
 </style>
 </head>
 <body>
@@ -551,6 +584,8 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
 <header>
   <h1>物资刷新提醒</h1>
   <div class="sub">点击物资图标开始倒计时</div>
+  <div class="mode-chip test-mode-chip">测试模式</div>
+  <div class="mode-chip recall-chip">回忆中</div>
   <div class="lock-status" id="lockStatus"></div>
 </header>
 
@@ -570,6 +605,7 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   <button onclick="resetAll()">重置全部计时</button>
   <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
   <button onclick="openCustomModal()">＋ 新增物资</button>
+  <button onclick="toggleRecallMode()" id="recallBtn">回忆</button>
 </div>
 
 <div class="custom-modal-overlay hidden" id="customModal">
@@ -591,6 +627,19 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
     </div>
     <div class="cm-list-title">已添加的物资</div>
     <div class="cm-list" id="cmList"></div>
+  </div>
+</div>
+
+<div class="custom-modal-overlay hidden" id="recallModal">
+  <div class="custom-modal">
+    <h3>回忆补计时</h3>
+    <div id="recallResName" style="text-align:center;font-size:15px;color:var(--accent);margin:4px 0 8px"></div>
+    <label>先前的时间点</label>
+    <input type="text" id="recallTime" placeholder="如：2小时前 或 昨天15:00" autocomplete="off">
+    <div class="cm-actions">
+      <button class="cm-cancel" onclick="closeRecallModal()">取消</button>
+      <button class="cm-save" onclick="doRecall()">开始计时</button>
+    </div>
   </div>
 </div>
 
@@ -1191,11 +1240,94 @@ function deleteCustomResource(id) {
   renderCustomList();
 }
 
+// ====== 回忆补计时 ======
+function parseRecallTime(input) {
+  const s = (input || '').trim().replace(/\s+/g, '');
+  if (!s) return null;
+
+  // 相对时间：X天前 / X小时前 / X分钟前 / X秒前（可组合）
+  const rel = s.match(/^(?:(\d+(?:\.\d+)?)天)?(?:(\d+(?:\.\d+)?)小时)?(?:(\d+(?:\.\d+)?)分钟)?(?:(\d+)秒)?前$/);
+  if (rel && (rel[1] || rel[2] || rel[3] || rel[4])) {
+    const d = parseFloat(rel[1] || 0);
+    const h = parseFloat(rel[2] || 0);
+    const m = parseFloat(rel[3] || 0);
+    const sec = parseFloat(rel[4] || 0);
+    if (d || h || m || sec) return Math.round((d * 86400 + h * 3600 + m * 60 + sec) * 1000);
+  }
+
+  // 具体时间：大前天/前天/昨天/今天 + HH:MM 或 HH点MM分，或纯 HH:MM
+  const t = s.match(/^(大前天|前天|昨天|今天)?(\d{1,2})[:：点时](\d{1,2})?分?$/);
+  if (t && t[2]) {
+    const hh = parseInt(t[2], 10);
+    const mm = t[3] ? parseInt(t[3], 10) : 0;
+    if (hh > 24 || mm > 59) return null;
+    const dayOff = { '大前天': -3, '前天': -2, '昨天': -1, '今天': 0 }[t[1]] || 0;
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOff, hh, mm, 0, 0);
+    const diff = now.getTime() - target.getTime();
+    if (diff < 0) return null;
+    return diff;
+  }
+
+  return null;
+}
+
+var recallMode = false;
+var recallResId = null;
+var recallCloneSlot = null;
+
+function toggleRecallMode() {
+  recallMode = !recallMode;
+  if (recallMode) {
+    toast('回忆模式：请点击要补计的物资');
+  } else {
+    toast('已退出回忆模式');
+  }
+  const btn = document.getElementById('recallBtn');
+  if (btn) btn.classList.toggle('recall-on', recallMode);
+  document.body.classList.toggle('recall-mode', recallMode);
+}
+
+function openRecallInput(resId, slot) {
+  const r = resources.find(function(x) { return x.id === resId; });
+  if (!r) return;
+  recallResId = resId;
+  recallCloneSlot = slot || null;
+  const nameText = slot ? '已选物资：' + r.name + '（分身' + slot + '）' : '已选物资：' + r.name;
+  document.getElementById('recallResName').textContent = nameText;
+  document.getElementById('recallTime').value = '';
+  document.getElementById('recallModal').classList.remove('hidden');
+}
+
+function closeRecallModal() {
+  document.getElementById('recallModal').classList.add('hidden');
+}
+
+function doRecall() {
+  const r = resources.find(function(x) { return x.id === recallResId; });
+  if (!r) { alert('请先选择物资'); return; }
+  const pastMs = parseRecallTime(document.getElementById('recallTime').value);
+  if (pastMs === null || pastMs <= 0) {
+    alert('时间格式不对，示例：2小时前 或 昨天15:00');
+    return;
+  }
+  const startTime = testMode ? (Date.now() - Math.round(pastMs / 60)) : (Date.now() - pastMs);
+  closeRecallModal();
+  if (recallCloneSlot) {
+    startClone(recallResId, recallCloneSlot, startTime);
+    recallCloneSlot = null;
+  } else {
+    startTimer(r, undefined, undefined, startTime);
+  }
+  toast('已回忆补计时：' + r.name);
+}
+
 // ====== 状态管理 ======
 const STORAGE_KEY = 'respawn_timers';
 const islandSelections = {}; // per-resource island selection (UI only, defaults to 1)
 const MIN_CHECK_INTERVAL = 2000; // 2秒检查一次
 let testMode = localStorage.getItem('testMode') === '1'; // 测试模式：1分钟=1秒
+document.body.classList.toggle('test-mode', testMode);
 let currentCat = 'crop';
 
 function loadTimers() {
@@ -1882,7 +2014,15 @@ function _doRender() {
       e.stopPropagation();
       const rid = parseInt(b.parentElement.dataset.rid);
       const slot = parseInt(b.dataset.slot);
-      startClone(rid, slot);
+      if (recallMode) {
+        recallMode = false;
+        const rbtn = document.getElementById('recallBtn');
+        if (rbtn) rbtn.classList.remove('recall-on');
+        document.body.classList.remove('recall-mode');
+        openRecallInput(rid, slot);
+      } else {
+        startClone(rid, slot);
+      }
       closeAllPopups();
     });
   });
@@ -1898,6 +2038,14 @@ function _doRender() {
 function onCardClick(resId) {
   const r = resources.find(x => x.id === resId);
   if (!r) return;
+  if (recallMode) {
+    recallMode = false;
+    const btn = document.getElementById('recallBtn');
+    if (btn) btn.classList.remove('recall-on');
+    document.body.classList.remove('recall-mode');
+    openRecallInput(resId);
+    return;
+  }
   const state = getTimerState(resId);
 
   if (state && state.daily) {
@@ -1952,10 +2100,10 @@ function onCardClick(resId) {
   }
 }
 
-function startTimer(r, customMin, customMax) {
+function startTimer(r, customMin, customMax, startTimeOverride) {
   __iv();
   const timers = loadTimers();
-  const now = Date.now();
+  const now = startTimeOverride || Date.now();
   const island = islandSelections[r.id] || 1;
   const effMin = customMin || r.min;
   const effMax = customMax || customMin || r.max;
@@ -1996,10 +2144,10 @@ function startTimer(r, customMin, customMax) {
     toast('⏱ ' + r.name + '（岛屿' + island + '）：' + (isVar ? formatTime(effMin) + '~' + formatTime(effMax) : formatTime(effMax)));
     const msPerMin = testMode ? 1000 : 60000;
     if (isVar) {
-      schedulePush(r.name + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(effMax - effMin) + '【间隔时间】后', Date.now() + effMin * msPerMin, timerKey);
-      schedulePush(r.name + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(effMax), Date.now() + effMax * msPerMin, timerKey);
+      schedulePush(r.name + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(effMax - effMin) + '【间隔时间】后', now + effMin * msPerMin, timerKey);
+      schedulePush(r.name + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(effMax), now + effMax * msPerMin, timerKey);
     } else {
-      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + effMax * msPerMin, timerKey);
+      schedulePush(r.name + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', now + effMax * msPerMin, timerKey);
     }
   }
 
@@ -2007,7 +2155,7 @@ function startTimer(r, customMin, customMax) {
   if (navigator.vibrate) navigator.vibrate(50);
 }
 
-function startClone(rid, slot) {
+function startClone(rid, slot, startTimeOverride) {
   const r = resources.find(x => x.id === rid);
   const timers = loadTimers();
   if (!timers[rid]) timers[rid] = {};
@@ -2022,22 +2170,25 @@ function startClone(rid, slot) {
     return;
   }
 
-  // Allow custom time for clones
+  // Allow custom time for clones (skip prompt when recall startTime provided)
   let effMin = r.min, effMax = r.max, isVar = r.v || false;
-  const label = isVar ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '自定义';
-  try {
-    const input = prompt(r.name + ' 分身' + slot + ' 时间：' + label + '\n输入自定义分钟数（留空默认）：', '');
-    if (input === null) return;
-    if (input.trim() !== '') {
-      const cm = parseInt(input);
-      if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); return; }
-      effMin = cm; effMax = cm; isVar = false;
-    }
-  } catch(e) {}
+  if (startTimeOverride === undefined) {
+    const label = isVar ? formatTime(r.min) + '~' + formatTime(r.max) : r.min > 0 ? formatTime(r.min) : '自定义';
+    try {
+      const input = prompt(r.name + ' 分身' + slot + ' 时间：' + label + '\n输入自定义分钟数（留空默认）：', '');
+      if (input === null) return;
+      if (input.trim() !== '') {
+        const cm = parseInt(input);
+        if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); return; }
+        effMin = cm; effMax = cm; isVar = false;
+      }
+    } catch(e) {}
+  }
   const island = islandSelections[rid] || 1;
   const timerKey = rid + '_' + slot + '_' + Date.now();
+  const startTime = startTimeOverride || Date.now();
   timers[rid].clones[slot] = {
-    startTime: Date.now(),
+    startTime: startTime,
     min: effMin, max: effMax,
     minNotified: false, maxNotified: false,
     variable: isVar,
@@ -2051,10 +2202,10 @@ function startClone(rid, slot) {
   if (navigator.vibrate) navigator.vibrate(50);
   const msPerMin = testMode ? 1000 : 60000;
   if (r.v) {
-    schedulePush(r.name + ' 分身' + slot + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(r.max - r.min) + '【间隔时间】后', Date.now() + r.min * msPerMin);
-    schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(r.max), Date.now() + r.max * msPerMin, timerKey);
+    schedulePush(r.name + ' 分身' + slot + ' 刷新时间已到', '（岛屿' + island + '）至' + formatTime(r.max - r.min) + '【间隔时间】后', startTime + r.min * msPerMin);
+    schedulePush(r.name + ' 分身' + slot + ' 已停止刷新', '（岛屿' + island + '）上限' + formatTime(r.max), startTime + r.max * msPerMin, timerKey);
   } else {
-    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', Date.now() + r.max * msPerMin, timerKey);
+    schedulePush(r.name + ' 分身' + slot + ' 物资已刷新', '（岛屿' + island + '）刷新时间到', startTime + r.max * msPerMin, timerKey);
   }
 }
 
@@ -2265,6 +2416,7 @@ function toggleTestMode() {
   testMode = !testMode;
   localStorage.setItem('testMode', testMode ? '1' : '0');
   document.getElementById('testLabel').textContent = testMode ? '开' : '关';
+  document.body.classList.toggle('test-mode', testMode);
   if (testMode) {
     toast('测试模式：1分钟=1秒（倒计时会很快）');
   } else {
