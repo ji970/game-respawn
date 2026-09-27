@@ -1,0 +1,37 @@
+{
+    "@platforms": ["android"],
+    "id": "__W2A__com.respawn.timer",
+    "name": "物资刷新提醒",
+    "version": {
+        "name": "1.0.0",
+        "code": 100
+    },
+    "description": "游戏物资刷新计时提醒工具",
+    "launch_path": "index.html",
+    "icons": {
+        "72": "icons/icon-72.png",
+        "96": "icons/icon-96.png",
+        "128": "icons/icon-128.png",
+        "144": "icons/icon-144.png",
+        "192": "icons/icon-192.png",
+        "512": "icons/icon-512.png"
+    },
+    "permissions": {
+        "Vibrate": {
+            "description": "通知震动提醒"
+        },
+        "Push": {
+            "description": "本地通知提醒"
+        }
+    },
+    "plus": {
+        "statusbar": {
+            "immersed": false
+        },
+        "splashscreen": {
+            "autoclose": true,
+            "waiting": false
+        },
+        "popGesture": "none"
+    }
+}

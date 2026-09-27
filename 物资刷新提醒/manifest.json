@@ -1,0 +1,102 @@
+{
+    "@platforms" : [ "android", "iPhone", "iPad" ],
+    "id" : "H56D33882",
+    "name" : "物资刷新提醒",
+    "version" : {
+        "name" : "1.0",
+        "code" : "100"
+    },
+    "description" : "游戏物资刷新计时提醒工具",
+    "icons" : {
+        "72" : "icons/icon-72.png",
+        "96" : "icons/icon-96.png",
+        "128" : "icons/icon-128.png",
+        "144" : "icons/icon-144.png",
+        "192" : "icons/icon-192.png",
+        "512" : "icons/icon-512.png"
+    },
+    "launch_path" : "index.html",
+    "developer" : {
+        "name" : "",
+        "email" : "",
+        "url" : ""
+    },
+    "permissions" : {
+        "Cache" : {
+            "description" : "管理应用缓存"
+        },
+        "Console" : {
+            "description" : "跟踪调试输出日志"
+        },
+        "Device" : {
+            "description" : "访问设备信息"
+        },
+        "Events" : {
+            "description" : "应用扩展事件"
+        },
+        "File" : {
+            "description" : "访问本地文件系统"
+        },
+        "Invocation" : {
+            "description" : "使用Native.js能力"
+        },
+        "Runtime" : {
+            "description" : "访问运行期环境"
+        },
+        "Storage" : {
+            "description" : "管理应用本地数据"
+        },
+        "Webview" : {
+            "description" : "窗口管理"
+        },
+        "NativeObj" : {
+            "description" : "原生对象"
+        },
+        "FloatingWindow" : {
+            "description" : "悬浮窗"
+        }
+    },
+    "plus" : {
+        "splashscreen" : {
+            "autoclose" : true,
+            "waiting" : true
+        },
+        "popGesture" : "close",
+        "runmode" : "normal",
+        "distribute" : {
+            "apple" : {
+                "appid" : "",
+                "devices" : "universal",
+                "frameworks" : []
+            },
+            "google" : {
+                "packagename" : "com.respawn.timer",
+                "keystore" : "",
+                "password" : "",
+                "aliasname" : "",
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
+                    "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>",
+                    "<uses-permission android:name=\"android.permission.SCHEDULE_EXACT_ALARM\"/>",
+                    "<uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\"/>",
+                    "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\"/>",
+                    "<uses-permission android:name=\"android.permission.SYSTEM_ALERT_WINDOW\"/>"
+                ]
+            },
+            "orientation" : [ "portrait-primary" ],
+            "icons" : {
+                "android" : {
+                    "mdpi" : "icons/icon-72.png",
+                    "ldpi" : "icons/icon-72.png",
+                    "hdpi" : "icons/icon-72.png",
+                    "xhdpi" : "icons/icon-96.png",
+                    "xxhdpi" : "icons/icon-144.png"
+                }
+            },
+            "ios" : {
+                "dSYMs" : false
+            }
+        }
+    }
+}

@@ -1,6 +1,8 @@
 name: Push Notification Daemon
 
 on:
+  push:
+    branches: [master]
   schedule:
     - cron: '*/5 * * * *'  # 每5分钟（备份）
   workflow_dispatch:

@@ -604,8 +604,10 @@ body.recall-mode .card { border-color: rgba(124,77,255,0.55); box-shadow: 0 0 8p
 <div class="toolbar">
   <button onclick="resetAll()">重置全部计时</button>
   <button onclick="toggleTestMode()">测试模式: <span id="testLabel">关</span></button>
+  <button onclick="setAdvanceMinutes()">提前提醒</button>
   <button onclick="openCustomModal()">＋ 新增物资</button>
   <button onclick="toggleRecallMode()" id="recallBtn">回忆</button>
+  <button onclick="toggleFloatingWindow()" id="floatBtn">悬浮窗</button>
 </div>
 
 <div class="custom-modal-overlay hidden" id="customModal">
@@ -1322,19 +1324,273 @@ function doRecall() {
   toast('已回忆补计时：' + r.name);
 }
 
+// ====== 悬浮窗（调用原生插件） ======
+var _floatShown = false;
+var _floatTimer = null;
+
+function isFloatSupported() {
+  return (typeof plus !== 'undefined') && !!plus.bridge;
+}
+
+function checkOverlayPermission() {
+  if (typeof plus === 'undefined' || !plus.android) return false;
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Settings = plus.android.importClass('android.provider.Settings');
+    return Settings.canDrawOverlays(main);
+  } catch(e) { return false; }
+}
+
+function requestOverlayPermission() {
+  if (typeof plus === 'undefined' || !plus.android) return;
+  try {
+    var main = plus.android.runtimeMainActivity();
+    var Intent = plus.android.importClass('android.content.Intent');
+    var Settings = plus.android.importClass('android.provider.Settings');
+    var Uri = plus.android.importClass('android.net.Uri');
+    var intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse('package:' + main.getPackageName()));
+    main.startActivity(intent);
+  } catch(e) {}
+}
+
+function toggleFloatingWindow() {
+  if (!isFloatSupported()) {
+    toast('悬浮窗仅支持 App 版本');
+    return;
+  }
+  if (_floatShown) {
+    hideFloatingWindow();
+    return;
+  }
+  if (!checkOverlayPermission()) {
+    toast('请先开启"显示在其他应用上层"权限');
+    requestOverlayPermission();
+    return;
+  }
+  showFloatingWindow();
+}
+
+function showFloatingWindow() {
+  try {
+    plus.bridge.exec('FloatingWindow', 'show', [null, getFloatingPayload()]);
+    _floatShown = true;
+    if (_floatTimer) clearInterval(_floatTimer);
+    _floatTimer = setInterval(updateFloatingWindow, 5000);
+    toast('悬浮窗已开启');
+  } catch(e) {
+    toast('悬浮窗创建失败: ' + e);
+  }
+}
+
+function hideFloatingWindow() {
+  try {
+    plus.bridge.exec('FloatingWindow', 'hide', [null]);
+  } catch(e) {}
+  _floatShown = false;
+  if (_floatTimer) { clearInterval(_floatTimer); _floatTimer = null; }
+  toast('悬浮窗已关闭');
+}
+
+// ====== 供悬浮窗插件 evalJS 调用 ======
+window.resetTimerById = function(id, slot) {
+  if (slot) {
+    cancelTimer(parseInt(id, 10), parseInt(slot, 10));
+  } else {
+    cancelTimer(parseInt(id, 10));
+  }
+  updateFloatingWindow();
+};
+window.startTimerById = function(id, island, minutes) {
+  var rid = parseInt(id, 10);
+  var r = resources.find(function(x) { return x.id === rid; });
+  if (!r) return;
+  if (island) { islandSelections[rid] = parseInt(island, 10); }
+  if (r.min === 0) {
+    if (minutes) {
+      var mstr = String(minutes);
+      if (mstr.indexOf('~') >= 0 || mstr.indexOf('-') >= 0) {
+        var parts = mstr.split(/[~\-]/);
+        var cm = parseInt(parts[0], 10);
+        var cx = parseInt(parts[1], 10);
+        if (!isNaN(cm) && !isNaN(cx) && cm > 0 && cx > 0) {
+          startTimer(r, Math.min(cm, cx), Math.max(cm, cx));
+        } else {
+          startTimer(r, parseInt(minutes, 10));
+        }
+      } else {
+        startTimer(r, parseInt(minutes, 10));
+      }
+    } else {
+      try {
+        var input = prompt(r.name + ' 无默认时间，请输入分钟数：', '');
+        if (input === null) { updateFloatingWindow(); return; }
+        var cm = parseInt(input, 10);
+        if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); updateFloatingWindow(); return; }
+        startTimer(r, cm);
+      } catch(e) {
+        startTimer(r);
+      }
+    }
+  } else {
+    startTimer(r);
+  }
+  updateFloatingWindow();
+};
+window.startCloneById = function(id, island, minutes) {
+  var rid = parseInt(id, 10);
+  var r = resources.find(function(x) { return x.id === rid; });
+  if (!r) return;
+  var isl = island ? parseInt(island, 10) : (islandSelections[rid] || 1);
+  if (island) { islandSelections[rid] = isl; }
+  var cMin = r.min, cMax = r.max;
+  if (r.min === 0) {
+    if (minutes) {
+      var mstr = String(minutes);
+      if (mstr.indexOf('~') >= 0 || mstr.indexOf('-') >= 0) {
+        var parts = mstr.split(/[~\-]/);
+        var cm = parseInt(parts[0], 10);
+        var cx = parseInt(parts[1], 10);
+        if (!isNaN(cm) && !isNaN(cx) && cm > 0 && cx > 0) {
+          cMin = Math.min(cm, cx);
+          cMax = Math.max(cm, cx);
+        } else {
+          cMin = parseInt(minutes, 10);
+          cMax = cMin;
+        }
+      } else {
+        cMin = parseInt(minutes, 10);
+        cMax = cMin;
+      }
+    } else {
+      try {
+        var input = prompt(r.name + ' 分身 无默认时间，请输入分钟数：', '');
+        if (input === null) { updateFloatingWindow(); return; }
+        var cm = parseInt(input, 10);
+        if (isNaN(cm) || cm <= 0) { toast('请输入有效分钟数'); updateFloatingWindow(); return; }
+        cMin = cm; cMax = cm;
+      } catch(e) {}
+    }
+  }
+  var timers = loadTimers();
+  if (!timers[rid]) timers[rid] = {};
+  if (!timers[rid].clones) timers[rid].clones = {};
+  var slot = 1;
+  for (var s = 1; s <= 10; s++) {
+    if (!timers[rid].clones[s]) { slot = s; break; }
+  }
+  timers[rid].clones[slot] = {
+    startTime: Date.now(),
+    min: cMin, max: cMax,
+    minNotified: false, maxNotified: false,
+    variable: (cMin !== cMax) || r.v || false,
+    island: isl,
+    timerKey: rid + '_' + slot + '_' + Date.now()
+  };
+  saveTimers(timers);
+  renderCards();
+  updateFloatingWindow();
+};
+window.floatClosedByNative = function() {
+  _floatShown = false;
+  if (_floatTimer) { clearInterval(_floatTimer); _floatTimer = null; }
+};
+window.openAddTimerFromFloat = function() {
+  toast('请点击下方物资卡片开始计时');
+  currentCat = 'fav';
+  renderNav();
+  renderCards();
+};
+
+function getFloatingData() {
+  const timers = loadTimers();
+  const items = [];
+  const mult = testMode ? 60 : 1;
+  for (const rid of Object.keys(timers)) {
+    const t = timers[rid];
+    const r = resources.find(function(x) { return x.id === parseInt(rid); });
+    if (!r) continue;
+    const iconName = ICON_MAP[r.name] || '';
+    if (t.startTime && !(t.minNotified === true && t.maxNotified === true)) {
+      const elapsed = (Date.now() - t.startTime) / 1000 * mult;
+      if (t.variable || t.min !== t.max) {
+        const minRemain = Math.max(0, (t.min || r.min) * 60 - advanceMinutes * 60 - elapsed);
+        const maxRemain = Math.max(0, (t.max || r.max) * 60 - advanceMinutes * 60 - elapsed);
+        if (maxRemain > 0) items.push({ id: r.id, slot: 0, icon: iconName, name: r.name, time: formatCountdown(Math.ceil(minRemain)) + '~' + formatCountdown(Math.ceil(maxRemain)), island: t.island || 1 });
+      } else {
+        const remain = Math.max(0, (t.max || r.max) * 60 - advanceMinutes * 60 - elapsed);
+        if (remain > 0) items.push({ id: r.id, slot: 0, icon: iconName, name: r.name, time: formatCountdown(Math.ceil(remain)), island: t.island || 1 });
+      }
+    }
+    if (t.clones) {
+      for (const slot of [1,2,3,4,5,6,7,8,9,10]) {
+        const c = t.clones[slot];
+        if (c && !(c.minNotified === true && c.maxNotified === true)) {
+          const elapsed = (Date.now() - c.startTime) / 1000 * mult;
+          if (c.variable || c.min !== c.max) {
+            const minRemain = Math.max(0, c.min * 60 - advanceMinutes * 60 - elapsed);
+            const maxRemain = Math.max(0, c.max * 60 - advanceMinutes * 60 - elapsed);
+            if (maxRemain > 0) items.push({ id: r.id, slot: slot, icon: iconName, name: r.name + ' 分身' + slot, time: formatCountdown(Math.ceil(minRemain)) + '~' + formatCountdown(Math.ceil(maxRemain)), island: c.island || 1 });
+          } else {
+            const remain = Math.max(0, c.max * 60 - advanceMinutes * 60 - elapsed);
+            if (remain > 0) items.push({ id: r.id, slot: slot, icon: iconName, name: r.name + ' 分身' + slot, time: formatCountdown(Math.ceil(remain)), island: c.island || 1 });
+          }
+        }
+      }
+    }
+  }
+  return items;
+}
+
+function getFloatingPayload() {
+  var favs = loadFavs().map(function(id) {
+    var r = resources.find(function(x) { return x.id === id; });
+    return r ? [r.id, r.name, ICON_MAP[r.name] || '', r.min] : null;
+  }).filter(function(x) { return !!x; });
+  return JSON.stringify({
+    res: resources.map(function(r) { return [r.id, r.name, ICON_MAP[r.name] || '', r.min]; }),
+    timers: getFloatingData(),
+    favs: favs
+  });
+}
+
+function updateFloatingWindow() {
+  try {
+    plus.bridge.exec('FloatingWindow', 'update', [null, getFloatingPayload()]);
+  } catch(e) {}
+}
+
 // ====== 状态管理 ======
 const STORAGE_KEY = 'respawn_timers';
 const islandSelections = {}; // per-resource island selection (UI only, defaults to 1)
 const MIN_CHECK_INTERVAL = 2000; // 2秒检查一次
 let testMode = localStorage.getItem('testMode') === '1'; // 测试模式：1分钟=1秒
+let advanceMinutes = parseInt(localStorage.getItem('advanceMinutes') || '2', 10); // 提前提醒分钟数
 document.body.classList.toggle('test-mode', testMode);
 let currentCat = 'crop';
 
 function loadTimers() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  var raw = null;
+  try {
+    if (typeof plus !== 'undefined' && plus.storage) {
+      raw = plus.storage.getItem(STORAGE_KEY);
+    }
+  } catch(e) {}
+  if (raw == null) { raw = localStorage.getItem(STORAGE_KEY); }
+  try { return JSON.parse(raw) || {}; }
   catch(e) { return {}; }
 }
-function saveTimers(t) { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); }
+function saveTimers(t) {
+  var s = JSON.stringify(t);
+  localStorage.setItem(STORAGE_KEY, s);
+  try {
+    if (typeof plus !== 'undefined' && plus.storage) {
+      plus.storage.setItem(STORAGE_KEY, s);
+    }
+  } catch(e) {}
+  if (typeof _floatShown !== 'undefined' && _floatShown) {
+    try { updateFloatingWindow(); } catch(e) {}
+  }
+}
 
 function getTimerState(resId) {
   const timers = loadTimers();
@@ -1407,7 +1663,7 @@ function requestNativeNotificationPermission() {
 
     // 请求忽略电池优化（防止系统杀后台闹钟）
     if (Build.VERSION.SDK_INT >= 23) {
-      var pm = main.getSystemService(plus.android.importClass('android.content.Context').POWER_SERVICE);
+      var pm = main.getSystemService("power");
       if (!pm.isIgnoringBatteryOptimizations(main.getPackageName())) {
         var intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
         intent.setData(Uri.parse('package:' + main.getPackageName()));
@@ -1554,53 +1810,7 @@ function openAppSettings() {
 function notifyNative(title, body) {
   if (!isNativeApp()) return false;
   try {
-    // 方式1: HTML5+ 本地推送消息
-    if (plus.push) {
-      plus.push.createMessage(body, {
-        title: title,
-        cover: false,
-        when: new Date()
-      });
-      return true;
-    }
-  } catch(e) {}
-  try {
-    // 方式2: native.js 直接调 Android NotificationManager
-    var main = plus.android.runtimeMainActivity();
-    var Context = plus.android.importClass('android.content.Context');
-    var NotificationManager = plus.android.importClass('android.app.NotificationManager');
-    var Notification = plus.android.importClass('android.app.Notification');
-    var Intent = plus.android.importClass('android.content.Intent');
-    var PendingIntent = plus.android.importClass('android.app.PendingIntent');
-    var Build = plus.android.importClass('android.os.Build');
-    var nm = main.getSystemService(Context.NOTIFICATION_SERVICE);
-    var CH_ID = 'respawn_timer';
-    if (Build.VERSION.SDK_INT >= 26) {
-      var NotificationChannel = plus.android.importClass('android.app.NotificationChannel');
-      var channel = new NotificationChannel(CH_ID, '物资刷新提醒', NotificationManager.IMPORTANCE_HIGH);
-      channel.enableVibration(true);
-      nm.createNotificationChannel(channel);
-    }
-    var intent = new Intent(main, main.getClass());
-    intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-    var flags = PendingIntent.FLAG_UPDATE_CURRENT;
-    if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000; // FLAG_IMMUTABLE
-    var pi = PendingIntent.getActivity(main, 0, intent, flags);
-    var drawable = plus.android.importClass('android.R$drawable');
-    var builder;
-    if (Build.VERSION.SDK_INT >= 26) {
-      builder = new Notification.Builder(main, CH_ID);
-    } else {
-      builder = new Notification.Builder(main);
-    }
-    builder.setContentTitle(title);
-    builder.setContentText(body);
-    builder.setSmallIcon(drawable.ic_dialog_info);
-    builder.setAutoCancel(true);
-    builder.setContentIntent(pi);
-    builder.setDefaults(Notification.DEFAULT_VIBRATE | Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND);
-    builder.setPriority(Notification.PRIORITY_HIGH);
-    nm.notify(Math.floor(Date.now() % 100000), builder.build());
+    plus.bridge.exec('FloatingWindow', 'notify', [null, title, body]);
     return true;
   } catch(e) {
     return false;
@@ -1770,7 +1980,7 @@ function _doRender() {
       if (state.daily) {
         countdownHtml = '每日定时中';
       } else {
-      const ADV = 2;
+      const ADV = advanceMinutes;
       if (state.minNotified === false && (state.variable || state.min !== state.max)) {
         nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
         if (nextCheckSec <= 0) nextCheckSec = 0;
@@ -2284,8 +2494,8 @@ function checkTimers() {
     if (!r) continue;
 
     const islandTag = '（岛屿' + (t.island || 1) + '）';
-    const minSec = Math.max(0, t.min * 60 - 2 * 60);
-    const maxSec = Math.max(0, t.max * 60 - 2 * 60);
+    const minSec = Math.max(0, t.min * 60 - advanceMinutes * 60);
+    const maxSec = Math.max(0, t.max * 60 - advanceMinutes * 60);
 
     // Check "可能刷新" (variable only, min < max)
     if (t.variable && t.minNotified === false && elapsed >= minSec) {
@@ -2321,8 +2531,8 @@ function checkTimers() {
       const r = resources.find(x => x.id === parseInt(rid));
       if (!r) continue;
       const islandTag = '（岛屿' + (c.island || 1) + '）';
-      const minSec = Math.max(0, c.min * 60 - 2 * 60);
-      const maxSec = Math.max(0, c.max * 60 - 2 * 60);
+      const minSec = Math.max(0, c.min * 60 - advanceMinutes * 60);
+      const maxSec = Math.max(0, c.max * 60 - advanceMinutes * 60);
       if (c.variable && c.minNotified === false && elapsed >= minSec) {
         c.minNotified = true; changed = true;
         notify(r.name + ' 分身' + slot + ' 刷新时间已到', islandTag + ' 至' + formatTime(c.max - c.min) + '【间隔时间】后可能刷新！');
@@ -2400,7 +2610,7 @@ function checkDailyTimers(rid, t) {
     nextTarget = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
   }
 
-  const delay = nextTarget.getTime() - now.getTime() - 2 * 60 * 1000;
+  const delay = nextTarget.getTime() - now.getTime() - advanceMinutes * 60 * 1000;
   if (delay > 0) {
     setTimeout(() => {
       const t2 = loadTimers();
@@ -2423,6 +2633,18 @@ function toggleTestMode() {
     toast('已恢复正常时间');
   }
   renderCards();
+}
+
+function setAdvanceMinutes() {
+  var input = prompt('提前提醒分钟数（0 表示不提前）：', String(advanceMinutes));
+  if (input === null) return;
+  var v = parseInt(input, 10);
+  if (isNaN(v) || v < 0) { toast('请输入有效分钟数'); return; }
+  advanceMinutes = v;
+  localStorage.setItem('advanceMinutes', String(v));
+  toast('提前提醒已设为 ' + v + ' 分钟');
+  renderCards();
+  updateFloatingWindow();
 }
 
 // ====== 轻量刷新倒计时 ======
@@ -2453,7 +2675,7 @@ function refreshCountdowns() {
     }
 
     const elapsed = (Date.now() - state.startTime) / 1000 * mult;
-    const ADV = 2;
+    const ADV = advanceMinutes;
     let nextCheckSec = Infinity;
     if (state.minNotified === false && (state.variable || state.min !== state.max)) {
       nextCheckSec = Math.max(0, (state.min || r.min) * 60 - ADV * 60) - elapsed;
@@ -2505,7 +2727,7 @@ function refreshCountdowns() {
     const c = state.clones[slot];
     if (!c.startTime) return;
     const elapsed = (Date.now() - c.startTime) / 1000 * mult;
-    const ADV = 2;
+    const ADV = advanceMinutes;
     let nextSec = Math.max(0, c.max * 60 - ADV * 60 - elapsed);
     if (c.variable && c.minNotified === false) {
       const minSec = Math.max(0, c.min * 60 - ADV * 60 - elapsed);
@@ -2533,6 +2755,11 @@ function refreshCountdowns() {
 function initApp() {
   renderNav();
   renderCards(true);
+  // 网页版隐藏悬浮窗入口
+  if (typeof plus === 'undefined') {
+    var fb = document.getElementById('floatBtn');
+    if (fb) fb.style.display = 'none';
+  }
   // Sync test mode toggle label
   document.getElementById('testLabel').textContent = testMode ? '开' : '关';
 
@@ -2816,7 +3043,7 @@ function setNativeAlarm(wakeAt, title, body) {
     if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000; // FLAG_IMMUTABLE
     var pi = PendingIntent.getActivity(main, _nativeAlarmId, intent, flags);
 
-    var am = main.getSystemService(Context.ALARM_SERVICE);
+    var am = main.getSystemService("alarm");
 
     // setAlarmClock 优先级最高，Doze/省电模式也不会延迟太久
     if (Build.VERSION.SDK_INT >= 21) {
@@ -2845,7 +3072,7 @@ function cancelAllNativeAlarms() {
     if (Build.VERSION.SDK_INT >= 23) flags |= 0x4000000;
     var pi = PendingIntent.getActivity(main, _nativeAlarmId, intent, flags);
 
-    var am = main.getSystemService(Context.ALARM_SERVICE);
+    var am = main.getSystemService("alarm");
     am.cancel(pi);
     pi.cancel();
   } catch(e) {}
