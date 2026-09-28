@@ -653,7 +653,6 @@ const APP_VERSION = 1;
 const __sig = 'v2h7k9'; // 自校验签名，和服务器 version.json 比对
 
 // ====== 激活码验证 ======
-const ACTIVATION_SECRET = '625719'; // 和 keygen.html 保持一致
 const SUPABASE_URL = 'https://gwjqhrqmfamjrdhllrqk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9yotjhKymQTb-QfAEG0qbw_c4-btV6l';
 const CLOUD_FUNC_URL = 'https://YOUR_ENV_ID.service.tcloudbase.com/activation'; // 腾讯云函数 HTTP 地址（部署后填入）
@@ -663,17 +662,6 @@ function getDeviceId() {
   var ua = navigator.userAgent;
   var platform = (ua.match(/Android|iPhone|iPad|Windows|Mac|Linux/i) || [''])[0];
   return screen.width + 'x' + screen.height + '|' + platform + '|' + (navigator.hardwareConcurrency || '0');
-}
-
-async function hmacHex(message, secret) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function getActivation() {
@@ -689,61 +677,17 @@ function __iv() { if (!__v) { document.body.innerHTML = '<div style=\"color:#fff
 })();
 async function preloadAssets() {
   const act = getActivation();
-  if (!act || !act.expiryHex || !act.sig) { __v = 0; localStorage.setItem('_dbg', '1'); return false; }
+  if (!act || !act.expiryHex) { __v = 0; localStorage.setItem('_dbg', '1'); return false; }
 
-  // Verify signature (supports both old 8+8 and new 8+4+4 formats)
-  let expectedSig;
-  if (act.nonce !== undefined) {
-    expectedSig = (await hmacHex(act.expiryHex + act.nonce, ACTIVATION_SECRET)).slice(0, 4);
-  } else {
-    expectedSig = (await hmacHex(act.expiryHex, ACTIVATION_SECRET)).slice(0, 8);
-  }
-  if (act.sig !== expectedSig) { localStorage.setItem('_dbg', '2'); return false; }
-
-  // Check device binding (local fingerprint)
   var curDevice = getDeviceId();
   if (act.device && act.device !== curDevice) {
-    // Migrate to current format (same app = same device)
     act.device = curDevice;
     localStorage.setItem('activation', JSON.stringify(act));
   }
 
-  // Check expiry
-  if (act.expiryHex === 'ffffffff') { __v = 1; return true; } // permanent
+  if (act.expiryHex === 'ffffffff') { __v = 1; return true; }
   const expiry = parseInt(act.expiryHex, 16) * 1000;
   if (Date.now() > expiry) { localStorage.setItem('_dbg', '3'); return false; }
-
-  // Server-side validation (every 24h, with 7-day offline grace)
-  // 72h bomb: first install check is mandatory
-  var installTime = parseInt(localStorage.getItem('_it') || '0');
-  var mustCheck = installTime && (Date.now() - installTime > 259200000); // 72h
-  if (CLOUD_FUNC_URL) {
-    var lastCheck = parseInt(localStorage.getItem('_ac_last') || '0');
-    if (mustCheck || Date.now() - lastCheck > 86400000) {
-      try {
-        var codeHash = act.code_hash;
-        if (!codeHash) { if (!mustCheck) { localStorage.setItem('_ac_last', Date.now().toString()); return true; } } // 旧激活跳过，除非强制
-        var sRes = await fetch(CLOUD_FUNC_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'check', code_hash: codeHash, device: curDevice })
-        });
-        if (sRes.ok) {
-          var sData = await sRes.json();
-          if (sData.device && sData.device !== curDevice) {
-            // Device mismatch: skip for now, allow local use
-            localStorage.setItem('_dbg', '4');
-          }
-          localStorage.setItem('_ac_last', Date.now().toString());
-        } else if (mustCheck) {
-          localStorage.setItem('_dbg', '5'); return false;
-        }
-      } catch(e) {
-        if (mustCheck) { localStorage.setItem('_dbg', '6'); return false; }
-        if (Date.now() - lastCheck > 604800000) { localStorage.setItem('_dbg', '7'); return false; }
-      }
-    }
-  }
 
   __v = 1;
   return true;
@@ -761,83 +705,38 @@ async function activate() {
     return;
   }
 
-  const expiryHex = input.slice(0, 8);
-
-  // Try new format first (8+4+4), then old format (8+8)
-  const newNonce = input.slice(8, 12);
-  const newSig = input.slice(12, 16);
-  const expectedNew = (await hmacHex(expiryHex + newNonce, ACTIVATION_SECRET)).slice(0, 4);
-
-  let sig, nonce;
-  if (newSig === expectedNew) {
-    sig = newSig;
-    nonce = newNonce;
-  } else {
-    const oldSig = input.slice(8, 16);
-    const expectedOld = (await hmacHex(expiryHex, ACTIVATION_SECRET)).slice(0, 8);
-    if (oldSig === expectedOld) {
-      sig = oldSig;
-      nonce = undefined;
-    } else {
-      errEl.textContent = '激活码无效';
-      btn.disabled = false; btn.textContent = '激活';
-      return;
-    }
-  }
-
-  // Check not expired
-  if (expiryHex !== 'ffffffff') {
-    const expiry = parseInt(expiryHex, 16) * 1000;
-    if (Date.now() > expiry) {
-      errEl.textContent = '激活码已过期';
-      btn.disabled = false; btn.textContent = '激活';
-      return;
-    }
-  }
-
   const device = getDeviceId();
-  const codeHash = (await hmacHex(input, ACTIVATION_SECRET)).slice(0, 16);
-
-  // Server verification (cloud function)
-  if (CLOUD_FUNC_URL) {
-    try {
-      const bindRes = await fetch(CLOUD_FUNC_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'bind', code_hash: codeHash, device: device })
-      });
-      var bindData = await bindRes.json();
-      if (bindData.error) {
-        if (bindData.error === '此激活码已在其他设备使用') {
-          errEl.textContent = bindData.error;
-        } else {
-          errEl.textContent = '网络异常，请检查网络后重试';
-        }
-        btn.disabled = false; btn.textContent = '激活';
-        return;
-      }
-    } catch(e) {
-      errEl.textContent = '网络异常，请检查网络后重试';
+  try {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/verify-activation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+      },
+      body: JSON.stringify({ code: input, device: device }),
+    });
+    const data = await res.json();
+    if (data && data.valid) {
+      const actData = {
+        expiryHex: data.expiry,
+        activatedAt: Date.now(),
+        device: device,
+      };
+      localStorage.setItem('activation', JSON.stringify(actData));
+      __v = 1;
+      document.getElementById('lockScreen').classList.add('hidden');
+      updateStatus();
+      initApp();
+    } else {
+      var errMap = { invalid: '激活码无效', expired: '激活码已过期', device: '此激活码已在其他设备使用', server: '服务器错误' };
+      errEl.textContent = (data && data.error && errMap[data.error]) || '激活失败';
       btn.disabled = false; btn.textContent = '激活';
-      return;
     }
+  } catch(e) {
+    errEl.textContent = '网络异常，请检查网络后重试';
+    btn.disabled = false; btn.textContent = '激活';
   }
-
-  // Save locally
-  const actData = {
-    expiryHex: expiryHex,
-    sig: sig,
-    activatedAt: Date.now(),
-    device: device,
-    code_hash: codeHash,
-  };
-  if (nonce !== undefined) actData.nonce = nonce;
-  localStorage.setItem('activation', JSON.stringify(actData));
-  __v = 1; // anti-tamper: mark as legitimately activated
-
-  document.getElementById('lockScreen').classList.add('hidden');
-  updateStatus();
-  initApp();
 }
 
 function updateStatus() {
