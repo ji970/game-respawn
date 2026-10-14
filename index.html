@@ -1720,6 +1720,22 @@ function formatCountdown(remainingSeconds) {
   return parts.join('');
 }
 
+// 格式化绝对时间：24小时制 HH:MM，跨天加日期前缀
+function formatClock(ms) {
+  const d = new Date(ms);
+  const now = new Date();
+  const hh = ('0' + d.getHours()).slice(-2);
+  const mm = ('0' + d.getMinutes()).slice(-2);
+  let s = hh + ':' + mm;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((target - today) / 86400000);
+  if (dayDiff > 0) {
+    s = (dayDiff === 1 ? '明天' : (d.getMonth() + 1) + '/' + d.getDate()) + ' ' + s;
+  }
+  return s;
+}
+
 
 // ====== 备注功能 ======
 function loadNotes() {
@@ -1867,10 +1883,11 @@ function _doRender() {
         countdownCls = 'expired-text';
       } else {
         const cdText = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        const absTime = formatClock(now + nextCheckSec * 1000 / mult);
         if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
-          countdownHtml = '已刷新 ' + cdText + '后结束';
+          countdownHtml = '已刷新 ' + cdText + ' · ' + absTime + '结束';
         } else {
-          countdownHtml = cdText;
+          countdownHtml = cdText + ' · ' + absTime + '刷新';
         }
       }
       }
@@ -2565,11 +2582,13 @@ function refreshCountdowns() {
         cdEl.textContent = '已刷新';
         cdEl.className = 'countdown expired-text';
       } else {
+        const now = Date.now();
         const t2 = '⏳ ' + formatCountdown(Math.ceil(nextCheckSec));
+        const absTime = formatClock(now + nextCheckSec * 1000 / mult);
         if (state.minNotified === true && state.maxNotified === false && state.min !== state.max) {
-          cdEl.textContent = '已刷新 ' + t2 + '后结束';
+          cdEl.textContent = '已刷新 ' + t2 + ' · ' + absTime + '结束';
         } else {
-          cdEl.textContent = t2;
+          cdEl.textContent = t2 + ' · ' + absTime + '刷新';
         }
         cdEl.className = 'countdown';
       }
