@@ -543,8 +543,27 @@ main { padding: 12px; max-width: 600px; margin: 0 auto; }
   color: #b388ff;
   border: 1px solid rgba(124,77,255,0.35);
 }
+.edit-mode-chip {
+  background: rgba(102,187,106,0.12);
+  color: #81c784;
+  border: 1px solid rgba(102,187,106,0.35);
+}
+.edit-mode-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.edit-mode-btn.edit-on { background: #66bb6a; color: #000; border-color: #66bb6a; font-weight: 600; }
 body.test-mode .test-mode-chip { display: block; }
 body.recall-mode .recall-chip { display: block; }
+body.edit-mode .edit-mode-chip { display: block; }
 
 /* 测试模式：轻微暖色调 + 卡片橙红边 */
 body.test-mode main { filter: sepia(0.1) saturate(1.08); }
@@ -553,6 +572,9 @@ body.test-mode .card { border-color: rgba(255,183,77,0.5); }
 /* 回忆模式：轻微复古暗色 + 卡片紫色柔和发光 */
 body.recall-mode main { filter: grayscale(0.25) brightness(0.88); }
 body.recall-mode .card { border-color: rgba(124,77,255,0.55); box-shadow: 0 0 8px rgba(124,77,255,0.28); }
+
+/* 修改模式：卡片绿色高亮边框，提示可点击修改 */
+body.edit-mode .card { border-color: rgba(102,187,106,0.7); box-shadow: 0 0 10px rgba(102,187,106,0.3); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -582,10 +604,12 @@ body.recall-mode .card { border-color: rgba(124,77,255,0.55); box-shadow: 0 0 8p
 </div>
 
 <header>
+  <button class="edit-mode-btn" id="editBtn" onclick="toggleEditMode()">✏️ 修改</button>
   <h1>物资刷新提醒</h1>
   <div class="sub">点击物资图标开始倒计时</div>
   <div class="mode-chip test-mode-chip">测试模式</div>
   <div class="mode-chip recall-chip">回忆中</div>
+  <div class="mode-chip edit-mode-chip">修改模式</div>
   <div class="lock-status" id="lockStatus"></div>
 </header>
 
@@ -961,6 +985,27 @@ function mergeCustomResources() {
   loadCustomResources().forEach(c => resources.push(c));
 }
 
+// ====== 预设物资的图片/时间修改 ======
+function loadEdits() {
+  try { return JSON.parse(localStorage.getItem('resource_edits')) || {}; }
+  catch(e) { return {}; }
+}
+function saveEdits(edits) {
+  localStorage.setItem('resource_edits', JSON.stringify(edits));
+}
+function mergeEdits() {
+  const edits = loadEdits();
+  for (const r of resources) {
+    if (r.id >= CUSTOM_ID_BASE) continue;
+    const e = edits[r.id];
+    if (!e) continue;
+    if (e.icon) r.icon = e.icon;
+    if (e.min != null) r.min = e.min;
+    if (e.max != null) r.max = e.max;
+    r.v = (r.min !== r.max);
+  }
+}
+
 var _editingCustomId = null;
 var _customIconData = '';
 
@@ -981,14 +1026,19 @@ function openCustomModal(id) {
   if (id) {
     const r = resources.find(x => x.id === id);
     if (!r) return;
+    const isPreset = id < CUSTOM_ID_BASE;
     document.getElementById('cmName').value = r.name;
     document.getElementById('cmTime').value = (r.min === r.max) ? String(r.min) : (r.min + '~' + r.max);
     document.getElementById('cmCat').value = r.cat;
+    document.getElementById('cmName').readOnly = isPreset;
+    document.getElementById('cmCat').disabled = isPreset;
     if (r.icon) { _customIconData = r.icon; document.getElementById('cmIconPreview').innerHTML = '<img src="' + r.icon + '">'; }
   } else {
     document.getElementById('cmName').value = '';
     document.getElementById('cmTime').value = '';
     document.getElementById('cmCat').value = 'crop';
+    document.getElementById('cmName').readOnly = false;
+    document.getElementById('cmCat').disabled = false;
   }
   document.getElementById('customModal').classList.remove('hidden');
   renderCustomList();
@@ -1084,17 +1134,29 @@ function saveCustomResourceFromForm() {
   if (max < min) { const t = min; min = max; max = t; }
 
   const id = _editingCustomId || Date.now();
-  const data = { id: id, name: name, cat: cat, min: min, max: max, icon: _customIconData || '', v: (min !== max) };
 
-  const custom = loadCustomResources();
-  const idx = custom.findIndex(c => c.id === id);
-  if (idx >= 0) custom[idx] = data; else custom.push(data);
-  try {
-    localStorage.setItem('custom_resources', JSON.stringify(custom));
-  } catch(e) {
-    alert('保存失败：图标过大或存储已满，请换一张更小的图片');
-    return;
+  if (id < CUSTOM_ID_BASE) {
+    const edits = loadEdits();
+    edits[id] = { icon: _customIconData || '', min: min, max: max };
+    try {
+      saveEdits(edits);
+    } catch(e) {
+      alert('保存失败：图标过大或存储已满，请换一张更小的图片');
+      return;
+    }
+  } else {
+    const data = { id: id, name: name, cat: cat, min: min, max: max, icon: _customIconData || '', v: (min !== max) };
+    const custom = loadCustomResources();
+    const idx = custom.findIndex(c => c.id === id);
+    if (idx >= 0) custom[idx] = data; else custom.push(data);
+    try {
+      localStorage.setItem('custom_resources', JSON.stringify(custom));
+    } catch(e) {
+      alert('保存失败：图标过大或存储已满，请换一张更小的图片');
+      return;
+    }
   }
+  mergeEdits();
   mergeCustomResources();
   renderCards();
   closeCustomModal();
@@ -1148,6 +1210,19 @@ function parseRecallTime(input) {
 var recallMode = false;
 var recallResId = null;
 var recallCloneSlot = null;
+
+var editMode = false;
+function toggleEditMode() {
+  editMode = !editMode;
+  if (editMode) {
+    toast('修改模式：点击卡片修改图片和时间');
+  } else {
+    toast('已退出修改模式');
+  }
+  const btn = document.getElementById('editBtn');
+  if (btn) btn.classList.toggle('edit-on', editMode);
+  document.body.classList.toggle('edit-mode', editMode);
+}
 
 function toggleRecallMode() {
   recallMode = !recallMode;
@@ -2136,6 +2211,14 @@ function _doRender() {
 function onCardClick(resId) {
   const r = resources.find(x => x.id === resId);
   if (!r) return;
+  if (editMode) {
+    editMode = false;
+    const ebtn = document.getElementById('editBtn');
+    if (ebtn) ebtn.classList.remove('edit-on');
+    document.body.classList.remove('edit-mode');
+    openCustomModal(resId);
+    return;
+  }
   if (recallMode) {
     recallMode = false;
     const btn = document.getElementById('recallBtn');
@@ -3015,6 +3098,7 @@ async function cancelPushQueue(timerKey) {
 }
 
 async function init() {
+  mergeEdits();
   mergeCustomResources();
   // Version check: block old APK versions
   try {
